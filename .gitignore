@@ -268,4 +268,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+repos/
+
+
 # End of https://www.toptal.com/developers/gitignore/api/python,fastapi,visualstudiocode,linux,macos,windows
