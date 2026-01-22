@@ -19,7 +19,7 @@ def submit_review(request:ReviewRequest):
     diff=runner.run()
     
     return{
-        "review id" : review_id,
+        "review_id" : review_id,
         "status" : "Diff Extracted",
-        "diff preview" : diff[:500]
+        "diff_preview" : diff[:500]
     }
