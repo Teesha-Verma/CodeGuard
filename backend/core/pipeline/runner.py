@@ -2,6 +2,7 @@
 from core.repo.clone import RepoCloner
 from core.repo.pr_fetcher import prFetcher
 from core.diff.extractor import diffExtractor
+from core.diff.parser import diffParser
 
 class pipelineRunner:
     def __init__(self, review_id: str, repo_url:str , pr_number:int ):
@@ -27,8 +28,17 @@ class pipelineRunner:
         print("[PIPELINE] Diff extracting...")
         diff = diffExtractor().extract(repo_path, base_branch, self.pr_number)
 
-        print("Diff extracted successfully! !")
-        return diff
+        # print("Diff extracted successfully! !")
+        # return diff
+
+        print("[PIPELINE] Parsing Diff....")
+        parsing = diffParser().parse(diff)
+
+        print("[PIPELINE] Parsed diff: ")
+        for item in parsing:
+            print(item)
+
+        return parsing        
 
 
 
