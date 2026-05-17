@@ -1,5 +1,6 @@
 from radon.visitors import ComplexityVisitor
 from radon.metrics import mi_visit
+from radon.complexity import cc_rank
 from typing import Dict, Any, List
 
 class ComplexityAnalyzer:
@@ -14,7 +15,7 @@ class ComplexityAnalyzer:
                 functions.append({
                     "name": func.name,
                     "complexity": func.complexity,
-                    "rank": func.rank,
+                    "rank": cc_rank(func.complexity),
                     "start_line": func.lineno,
                     "end_line": getattr(func, 'endline', func.lineno)
                 })
