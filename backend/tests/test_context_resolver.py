@@ -11,6 +11,9 @@ def test_context_resolver_test_files():
     res3 = ContextResolver.resolve("app/main.py")
     assert res3["is_test_file"] is False
 
+    res4 = ContextResolver.resolve("conftest.py")
+    assert res4["is_test_file"] is True
+
 def test_context_resolver_config_files():
     res1 = ContextResolver.resolve("config.py")
     assert res1["is_config_file"] is True

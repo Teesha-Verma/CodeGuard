@@ -120,6 +120,12 @@ class ConfidenceEngine:
             score += boost
             reasons.append(f"Changed-code confidence boost ({boost:+.2f}) applied.")
 
+        # Contextual override for B101/assert in test files (Phase 1)
+        rule_id = str(finding.get("rule_id", "")).upper() if isinstance(finding, dict) else ""
+        if (rule_id == "B101" or "assert" in str(finding.get("message", "")).lower()) and context_meta.get("is_test_file"):
+            score = 0.15
+            reasons = ["Assert statements in test files are standard practices. Confidence heavily reduced."]
+
         # ── Clamp to [0.10, 1.00] ────────────────────────────────
         final_score = round(max(0.10, min(1.0, score)), 2)
 

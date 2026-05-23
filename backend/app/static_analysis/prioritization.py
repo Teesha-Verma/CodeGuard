@@ -108,11 +108,21 @@ class PrioritizationEngine:
             is_low_signal = False
 
         # ── 4. CONTEXT OVERRIDES ─────────────────────────────────────────────
-        # If this is inside a test file, downgrade general issues
-        if context_meta.get("is_test_file") and category != "security":
-            priority = "low"
-            if category == "runtime logic risks":
+        if context_meta.get("is_test_file"):
+            if rule_upper == "B101" or "assert" in msg_lower or "assertion" in msg_lower:
+                priority = "low"
                 category = "style-only violations"
+                is_low_signal = True
+            elif category != "security":
+                priority = "low"
+                if category == "runtime logic risks":
+                    category = "style-only violations"
+
+        if context_meta.get("is_config_file") or context_meta.get("is_migration_file") or context_meta.get("is_generated_file"):
+            if category == "runtime logic risks":
+                priority = "low"
+                category = "style-only violations"
+                is_low_signal = True
 
         return {
             "signal_priority": priority,

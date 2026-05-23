@@ -113,3 +113,17 @@ def test_reasons_trace_populated():
     )
     assert len(result["reasons"]) >= 3  # base + linter + AST at minimum
     assert all(isinstance(r, str) for r in result["reasons"])
+
+
+def test_confidence_b101_test_file_override():
+    """B101/assert in test file should have heavily reduced confidence and reasoning suppressed."""
+    result = ConfidenceEngine.calculate(
+        finding={"line": 10, "rule_id": "B101", "message": "Use of assert detected"},
+        raw_sources=["bandit"],
+        evidence={"ast_nodes": [], "linter_rules": [{"tool": "bandit", "rule_id": "B101", "line": 10}], "trigger_lines": [10]},
+        context_meta={"is_test_file": True, "is_config_file": False, "is_migration_file": False, "is_generated_file": False}
+    )
+    assert result["confidence"] == 0.15
+    assert len(result["reasons"]) == 1
+    assert "Assert statements in test files are standard practices" in result["reasons"][0]
+

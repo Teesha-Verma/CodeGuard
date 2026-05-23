@@ -19,6 +19,7 @@ class ContextResolver:
         is_test_file = (
             basename.startswith("test_") 
             or basename.endswith("_test.py") 
+            or basename == "conftest.py"
             or "/tests/" in norm_path 
             or norm_path.startswith("tests/")
             or "/test/" in norm_path

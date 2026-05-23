@@ -45,3 +45,16 @@ def test_prioritization_test_file_override():
     res = PrioritizationEngine.analyze("ast", "global_modification", "global cache modified", context_meta=meta)
     assert res["signal_priority"] == "low"
     assert res["issue_category"] == "style-only violations"
+
+def test_prioritization_b101_override():
+    meta = {
+        "is_test_file": True,
+        "is_config_file": False,
+        "is_migration_file": False,
+        "is_generated_file": False
+    }
+    res = PrioritizationEngine.analyze("bandit", "B101", "Use of assert detected", context_meta=meta)
+    assert res["signal_priority"] == "low"
+    assert res["issue_category"] == "style-only violations"
+    assert res["is_low_signal"] is True
+
