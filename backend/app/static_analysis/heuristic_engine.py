@@ -177,37 +177,37 @@ class HeuristicEngine:
                     findings.append({
                         "rule_name": "excessive_nesting",
                         "line": node.lineno,
-                        "message": f"AST Node: Nesting depth ({self.current_depth}) exceeds the maximum safety limit ({max_depth})",
+                        "message": f"Deeply nested block ({self.current_depth} levels) exceeds the recommended limit of {max_depth}",
                         "evidence_strength": 0.7,
-                        "severity": "medium",
+                        "severity": "low",
                         "issue_type": "code_smell"
                     })
                 self.generic_visit(node)
                 self.current_depth -= 1
-
+ 
             def visit_While(self, node):
                 self.current_depth += 1
                 if self.current_depth > max_depth:
                     findings.append({
                         "rule_name": "excessive_nesting",
                         "line": node.lineno,
-                        "message": f"AST Node: Nesting depth ({self.current_depth}) exceeds the maximum safety limit ({max_depth})",
+                        "message": f"Deeply nested block ({self.current_depth} levels) exceeds the recommended limit of {max_depth}",
                         "evidence_strength": 0.7,
-                        "severity": "medium",
+                        "severity": "low",
                         "issue_type": "code_smell"
                     })
                 self.generic_visit(node)
                 self.current_depth -= 1
-
+ 
             def visit_If(self, node):
                 self.current_depth += 1
                 if self.current_depth > max_depth:
                     findings.append({
                         "rule_name": "excessive_nesting",
                         "line": node.lineno,
-                        "message": f"AST Node: Nesting depth ({self.current_depth}) exceeds the maximum safety limit ({max_depth})",
+                        "message": f"Deeply nested block ({self.current_depth} levels) exceeds the recommended limit of {max_depth}",
                         "evidence_strength": 0.7,
-                        "severity": "medium",
+                        "severity": "low",
                         "issue_type": "code_smell"
                     })
                 self.generic_visit(node)

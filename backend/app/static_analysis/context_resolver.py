@@ -54,9 +54,22 @@ class ContextResolver:
                     is_generated_file = True
                     break
 
+        # 5. Declarative/Schema File Heuristics (Phase 3)
+        is_declarative_file = False
+        declarative_keywords = ("typeddict", "protocol", "basemodel", "schema", "interface", "wrapper", "types")
+        if any(kw in norm_path for kw in declarative_keywords):
+            is_declarative_file = True
+        elif code:
+            code_lower = code.lower()
+            match_count = sum(code_lower.count(kw) for kw in declarative_keywords)
+            # If has TypedDict/Protocol/BaseModel declarations and few functions (under 3)
+            if match_count >= 1 and code_lower.count("def ") <= 2:
+                is_declarative_file = True
+
         return {
             "is_test_file": is_test_file,
             "is_config_file": is_config_file,
             "is_migration_file": is_migration_file,
-            "is_generated_file": is_generated_file
+            "is_generated_file": is_generated_file,
+            "is_declarative_file": is_declarative_file
         }

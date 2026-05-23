@@ -57,12 +57,12 @@ class ComplexityAnalyzer:
                 "mi_exceeds_threshold": mi_exceeds,
             }
 
-            # Phase 5: human-readable MI interpretation when threshold breached
+            # Phase 5: human-readable MI interpretation when threshold breached (Phase 3 refinement)
             if mi_exceeds:
                 result["mi_interpretation"] = (
-                    f"This code contains high cognitive density and low "
-                    f"maintainability (MI={mi_score:.1f}, threshold={mi_min}). "
-                    f"Suggest reducing deep nested branches."
+                    f"This code has increased structural density and lower "
+                    f"maintainability metrics (MI={mi_score:.1f}, threshold={mi_min}). "
+                    f"Suggest simplifying nested structures or decomposing logic."
                 )
 
             return result

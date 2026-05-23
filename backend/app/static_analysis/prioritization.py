@@ -52,6 +52,30 @@ class PrioritizationEngine:
             category = "style-only violations"
             is_low_signal = True
 
+        # ── 1B. NESTING & COMPLEXITY (Phase 3 Refinement) ───────────────────
+        elif (
+            rule_upper == "EXCESSIVE_NESTING"
+            or "nesting" in msg_lower
+            or "complexity" in msg_lower
+            or "cyclomatic" in msg_lower
+            or "maintainability" in msg_lower
+        ):
+            # Only escalate if nesting/complexity combines with branching explosion, recursion, mutation, or logic risk
+            escalate = (
+                "recursion" in msg_lower
+                or "mutation" in msg_lower
+                or "explosion" in msg_lower
+                or "high complexity" in msg_lower
+            )
+            if escalate:
+                priority = "medium"
+                category = "runtime logic risks"
+                is_low_signal = False
+            else:
+                priority = "low"
+                category = "maintainability insights"
+                is_low_signal = True
+
         # ── 2. SECURITY THREATS ──────────────────────────────────────────────
         elif (
             "security" in msg_lower 
@@ -122,6 +146,12 @@ class PrioritizationEngine:
             if category == "runtime logic risks":
                 priority = "low"
                 category = "style-only violations"
+                is_low_signal = True
+
+        if context_meta.get("is_declarative_file"):
+            if category in ("runtime logic risks", "maintainability insights"):
+                priority = "low"
+                category = "maintainability insights"
                 is_low_signal = True
 
         return {

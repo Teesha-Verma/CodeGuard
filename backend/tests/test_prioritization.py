@@ -58,3 +58,31 @@ def test_prioritization_b101_override():
     assert res["issue_category"] == "style-only violations"
     assert res["is_low_signal"] is True
 
+def test_prioritization_nesting_and_complexity():
+    # Nesting should be low/maintainability insights by default
+    res1 = PrioritizationEngine.analyze("ast", "EXCESSIVE_NESTING", "Deeply nested block (4 levels)")
+    assert res1["signal_priority"] == "low"
+    assert res1["issue_category"] == "maintainability insights"
+    assert res1["is_low_signal"] is True
+
+    # Unless escalated by recursion, mutation, branching explosion, etc.
+    res2 = PrioritizationEngine.analyze("ast", "EXCESSIVE_NESTING", "Deep nesting combined with recursion risk")
+    assert res2["signal_priority"] == "medium"
+    assert res2["issue_category"] == "runtime logic risks"
+    assert res2["is_low_signal"] is False
+
+def test_prioritization_declarative_override():
+    # In declarative/schema files, maintainability index issues are downgraded
+    meta = {
+        "is_test_file": False,
+        "is_config_file": False,
+        "is_migration_file": False,
+        "is_generated_file": False,
+        "is_declarative_file": True
+    }
+    res = PrioritizationEngine.analyze("ast", "EXCESSIVE_NESTING", "Deeply nested block (4 levels)", context_meta=meta)
+    assert res["signal_priority"] == "low"
+    assert res["issue_category"] == "maintainability insights"
+    assert res["is_low_signal"] is True
+
+
