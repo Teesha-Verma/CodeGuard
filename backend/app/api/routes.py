@@ -38,7 +38,8 @@ async def submit_pr_review(
         run_pr_review_task,
         review_id=review_id,
         repo_url=request.repo_url,
-        pr_number=request.pr_number
+        pr_number=request.pr_number,
+        verbose_ast=request.verbose_ast
     )
     
     return ReviewStatusResponse(
@@ -72,7 +73,8 @@ async def submit_snippet_review(
         review_id=review_id,
         code=request.code,
         language=request.language,
-        filename=request.filename
+        filename=request.filename,
+        verbose_ast=request.verbose_ast
     )
     
     return ReviewStatusResponse(

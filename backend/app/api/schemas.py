@@ -4,11 +4,13 @@ from typing import List, Optional, Dict, Any
 class ReviewRequest(BaseModel):
     repo_url: str = Field(..., description="GitHub repository URL")
     pr_number: int = Field(..., description="Pull request number")
+    verbose_ast: bool = Field(False, description="Return full AST metadata instead of summary")
 
 class SnippetReviewRequest(BaseModel):
     code: str = Field(..., description="Raw code snippet to review")
     language: str = Field("python", description="Language of the code snippet")
     filename: str = Field("snippet.py", description="Virtual filename for context")
+    verbose_ast: bool = Field(False, description="Return full AST metadata instead of summary")
 
 class ReviewIssue(BaseModel):
     line: int = Field(..., description="Line number where the issue was found")
@@ -35,6 +37,7 @@ class FileReport(BaseModel):
     file_path: str = Field(..., description="Path to the reviewed file")
     issues: List[ReviewIssue] = Field(default_factory=list, description="List of detected issues in this file")
     ast_metadata: Optional[Dict[str, Any]] = Field(None, description="Extracted AST structural metadata")
+    ast_summary: Optional[Dict[str, Any]] = Field(None, description="Summarized AST metadata")
     linter_findings: Optional[List[Dict[str, Any]]] = Field(None, description="Raw linter findings for this file")
 
 class ReviewReport(BaseModel):

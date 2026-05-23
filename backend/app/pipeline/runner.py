@@ -12,7 +12,7 @@ from app.evaluation.metrics import MetricsCalculator
 from app.core.config import get_settings
 from app.core.logger import get_logger
 
-def run_snippet_review_task(review_id: str, code: str, language: str, filename: str):
+def run_snippet_review_task(review_id: str, code: str, language: str, filename: str, verbose_ast: bool = False):
     logger = get_logger("codeguard.pipeline.runner")
     logger.info(f"Background task started for snippet review: {review_id}")
     
@@ -42,7 +42,7 @@ def run_snippet_review_task(review_id: str, code: str, language: str, filename: 
         
         # Run orchestrator
         orchestrator = PipelineOrchestrator(review_id=review_id)
-        file_report = orchestrator.process_file(diff_file, temp_dir)
+        file_report = orchestrator.process_file(diff_file, temp_dir, verbose_ast=verbose_ast)
         
         # Save traces to DB
         for trace in orchestrator.traces:
@@ -109,7 +109,7 @@ def run_snippet_review_task(review_id: str, code: str, language: str, filename: 
             shutil.rmtree(temp_dir, ignore_errors=True)
         db.close()
 
-def run_pr_review_task(review_id: str, repo_url: str, pr_number: int):
+def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_ast: bool = False):
     logger = get_logger("codeguard.pipeline.runner")
     logger.info(f"Background task started for PR review: {review_id} for {repo_url} #{pr_number}")
     
@@ -193,7 +193,7 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int):
         
         for diff_file in diff_files:
             if diff_file.file_path.endswith(".py"):
-                report = orchestrator.process_file(diff_file, repo_dir)
+                report = orchestrator.process_file(diff_file, repo_dir, verbose_ast=verbose_ast)
                 file_reports.append(report)
                 
         # Save traces to DB

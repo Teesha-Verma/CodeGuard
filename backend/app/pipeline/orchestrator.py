@@ -46,7 +46,7 @@ class PipelineOrchestrator:
         self.aggregator = FeatureAggregator()
         self.review_generator = ReviewGenerator(review_id)
         
-    def process_file(self, diff_file: DiffFile, repo_path: str) -> FileReport:
+    def process_file(self, diff_file: DiffFile, repo_path: str, verbose_ast: bool = False) -> FileReport:
         """Processes a single file through the analysis and reasoning pipeline."""
         import time
         self.logger.info(f"Processing file: {diff_file.file_path}")
@@ -129,6 +129,12 @@ class PipelineOrchestrator:
         # Collect traces from generator
         self.traces.extend(self.review_generator.traces)
         
+        summary = {
+            "function_count": len(ast_meta.get("functions", [])),
+            "class_count": len(ast_meta.get("classes", [])),
+            "dangerous_patterns": len(import_issues.get("dangerous_imports", [])) + len(heuristic_issues)
+        }
+
         return FileReport(
             file_path=diff_file.file_path,
             issues=final_issues,
@@ -137,7 +143,8 @@ class PipelineOrchestrator:
                 "classes": ast_meta.get("classes", []),
                 "complexity": comp,
                 "dangerous_calls": import_issues.get("dangerous_imports", [])
-            },
+            } if verbose_ast else None,
+            ast_summary=summary,
             linter_findings=[{
                 "rule": f.rule_id,
                 "message": f.message,
