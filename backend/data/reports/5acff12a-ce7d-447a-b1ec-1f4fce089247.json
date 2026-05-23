@@ -1,0 +1,130 @@
+{
+  "review_id": "5acff12a-ce7d-447a-b1ec-1f4fce089247",
+  "file_reports": [
+    {
+      "file_path": "unsafe_example.py",
+      "issues": [
+        {
+          "line": 5,
+          "severity": "critical",
+          "confidence": 0.75,
+          "issue": "Modifying list 'items' during traversal can cause skipped elements or runtime instability.",
+          "root_cause": "The list 'items' is being modified during iteration, which can cause skipped elements or runtime instability.",
+          "trigger_condition": "The issue triggers when the 'remove' method is called on the 'items' list within the loop that iterates over it.",
+          "fix": "Create a copy of the list before iterating over it, or use a list comprehension to filter out unwanted elements.",
+          "patch": "items = [item for item in items if item >= 0]",
+          "issue_type": "runtime_logic_error",
+          "sources": [
+            "ast",
+            "llm"
+          ],
+          "reasoning_trace": [
+            "Base confidence of 0.40 established.",
+            "AST mutation or scope pattern match (+0.25) confirmed.",
+            "Response validated against deterministic evidence constraints (+0.10).",
+            "LLM generated explanations grounded on ast"
+          ],
+          "evidence": {
+            "ast_nodes": [
+              {
+                "node_type": "Loop",
+                "line": 5,
+                "pattern": "list mutation during iteration",
+                "message": "Modifying list 'items' during traversal can cause skipped elements or runtime instability."
+              }
+            ],
+            "linter_rules": [],
+            "trigger_lines": [
+              5
+            ]
+          }
+        },
+        {
+          "line": 8,
+          "severity": "medium",
+          "confidence": 0.75,
+          "issue": "Modification of global variable 'cache_counter' inside function 'process_data' violates pure-function boundaries.",
+          "root_cause": "The function 'process_data' modifies the global variable 'cache_counter', violating the principle of a pure function which should have no side effects.",
+          "trigger_condition": "The issue triggers when the function 'process_data' is called and the global variable 'cache_counter' is modified.",
+          "fix": "Pass 'cache_counter' as a parameter to the function 'process_data' and return the updated value to avoid global modification.",
+          "patch": "Replace line 8 with 'cache_counter = cache_counter + 1' and pass 'cache_counter' as a parameter to the function 'process_data'.",
+          "issue_type": "code_smell",
+          "sources": [
+            "ast",
+            "llm"
+          ],
+          "reasoning_trace": [
+            "Base confidence of 0.40 established.",
+            "AST mutation or scope pattern match (+0.25) confirmed.",
+            "Response validated against deterministic evidence constraints (+0.10).",
+            "LLM generated explanations grounded on ast"
+          ],
+          "evidence": {
+            "ast_nodes": [
+              {
+                "node_type": "Assign",
+                "line": 8,
+                "pattern": "global_modification",
+                "message": "Modification of global variable 'cache_counter' inside function 'process_data' violates pure-function boundaries."
+              }
+            ],
+            "linter_rules": [],
+            "trigger_lines": [
+              8
+            ]
+          }
+        }
+      ],
+      "ast_metadata": {
+        "functions": [
+          {
+            "name": "process_data",
+            "start_line": 1,
+            "end_line": 11,
+            "args": [
+              "items"
+            ],
+            "is_async": false,
+            "is_recursive": false,
+            "has_docstring": false,
+            "is_changed": true
+          }
+        ],
+        "classes": [],
+        "complexity": {
+          "functions": [
+            {
+              "name": "process_data",
+              "complexity": 3,
+              "rank": "A",
+              "start_line": 1,
+              "end_line": 11,
+              "exceeds_threshold": false
+            }
+          ],
+          "maintainability_index": 98.98330037520456,
+          "mi_exceeds_threshold": false
+        },
+        "dangerous_calls": []
+      },
+      "linter_findings": []
+    }
+  ],
+  "summary_stats": {
+    "total_issues": 2,
+    "by_severity": {
+      "critical": 1,
+      "high": 0,
+      "medium": 1,
+      "low": 0,
+      "info": 0
+    },
+    "by_source": {
+      "ast": 2,
+      "llm": 2
+    },
+    "avg_confidence": 0.75
+  },
+  "evaluation_metrics": {},
+  "trace_id": "5acff12a-ce7d-447a-b1ec-1f4fce089247"
+}

@@ -1,0 +1,66 @@
+{
+  "review_id": "c55989fa-bc1a-4114-8c15-a1ed397cc2d0",
+  "file_reports": [
+    {
+      "file_path": "test.py",
+      "issues": [
+        {
+          "line": 1,
+          "severity": "high",
+          "confidence": 0.9,
+          "issue": "Mutable default argument in function 'foo'",
+          "root_cause": "Static analysis identified a code issue at line 1. Description: Mutable default argument in function 'foo'.",
+          "fix": "Review and resolve the flagged issue at line 1: Mutable default argument in function 'foo'.",
+          "patch": "",
+          "issue_type": "bug",
+          "source": "llm"
+        }
+      ],
+      "ast_metadata": {
+        "functions": [
+          {
+            "type": "FunctionDef",
+            "name": "foo",
+            "start_line": 1,
+            "end_line": 3,
+            "args": [
+              "x"
+            ],
+            "has_docstring": false,
+            "is_async": false
+          }
+        ],
+        "complexity": {
+          "functions": [
+            {
+              "name": "foo",
+              "complexity": 1,
+              "rank": "A",
+              "start_line": 1,
+              "end_line": 3
+            }
+          ],
+          "maintainability_index": 100.0
+        }
+      },
+      "linter_findings": []
+    }
+  ],
+  "summary_stats": {
+    "total_issues": 1,
+    "by_severity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 0,
+      "low": 0,
+      "info": 0
+    },
+    "by_source": {
+      "llm": 1,
+      "linter": 0
+    },
+    "avg_confidence": 0.9
+  },
+  "evaluation_metrics": {},
+  "trace_id": "c55989fa-bc1a-4114-8c15-a1ed397cc2d0"
+}

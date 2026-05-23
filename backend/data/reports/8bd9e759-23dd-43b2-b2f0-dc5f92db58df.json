@@ -1,0 +1,56 @@
+{
+  "review_id": "8bd9e759-23dd-43b2-b2f0-dc5f92db58df",
+  "file_reports": [
+    {
+      "file_path": "test.py",
+      "issues": [],
+      "ast_metadata": {
+        "functions": [
+          {
+            "name": "foo",
+            "start_line": 1,
+            "end_line": 3,
+            "args": [
+              "x"
+            ],
+            "is_async": false,
+            "is_recursive": false,
+            "has_docstring": false,
+            "is_changed": true
+          }
+        ],
+        "classes": [],
+        "complexity": {
+          "functions": [
+            {
+              "name": "foo",
+              "complexity": 1,
+              "rank": "A",
+              "start_line": 1,
+              "end_line": 3,
+              "exceeds_threshold": false
+            }
+          ],
+          "maintainability_index": 100.0,
+          "mi_exceeds_threshold": false
+        },
+        "dangerous_calls": []
+      },
+      "linter_findings": []
+    }
+  ],
+  "summary_stats": {
+    "total_issues": 0,
+    "by_severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "info": 0
+    },
+    "by_source": {},
+    "avg_confidence": 0.0
+  },
+  "evaluation_metrics": {},
+  "trace_id": "8bd9e759-23dd-43b2-b2f0-dc5f92db58df"
+}

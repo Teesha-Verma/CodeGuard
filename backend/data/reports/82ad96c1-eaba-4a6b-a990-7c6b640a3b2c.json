@@ -1,0 +1,493 @@
+{
+  "review_id": "82ad96c1-eaba-4a6b-a990-7c6b640a3b2c",
+  "file_reports": [
+    {
+      "file_path": "snippet.py",
+      "issues": [
+        {
+          "line": 8,
+          "severity": "high",
+          "confidence": 0.9,
+          "issue": "Use of dangerous built-in 'eval'",
+          "root_cause": "Static analysis identified a code issue at line 8. Description: Use of dangerous built-in 'eval'.",
+          "fix": "Review and resolve the flagged issue at line 8: Use of dangerous built-in 'eval'.",
+          "patch": "",
+          "issue_type": "bug",
+          "source": "llm"
+        },
+        {
+          "line": 4,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "pylint: Bad indentation. Found 1 spaces, expected 4",
+          "root_cause": "Static analysis identified a code issue at line 4. Description: pylint: Bad indentation. Found 1 spaces, expected 4.",
+          "fix": "Review and resolve the flagged issue at line 4: pylint: Bad indentation. Found 1 spaces, expected 4.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 16,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Final newline missing",
+          "root_cause": "Static analysis identified a code issue at line 16. Description: pylint: Final newline missing.",
+          "fix": "Review and resolve the flagged issue at line 16: pylint: Final newline missing.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 1,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Missing module docstring",
+          "root_cause": "Static analysis identified a code issue at line 1. Description: pylint: Missing module docstring.",
+          "fix": "Review and resolve the flagged issue at line 1: pylint: Missing module docstring.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 1,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Constant name \"password\" doesn't conform to UPPER_CASE naming style",
+          "root_cause": "Static analysis identified a code issue at line 1. Description: pylint: Constant name \"password\" doesn't conform to UPPER_CASE naming style.",
+          "fix": "Review and resolve the flagged issue at line 1: pylint: Constant name \"password\" doesn't conform to UPPER_CASE naming style.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 3,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Missing function or method docstring",
+          "root_cause": "Static analysis identified a code issue at line 3. Description: pylint: Missing function or method docstring.",
+          "fix": "Review and resolve the flagged issue at line 3: pylint: Missing function or method docstring.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 6,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Constant name \"unused_variable\" doesn't conform to UPPER_CASE naming style",
+          "root_cause": "Static analysis identified a code issue at line 6. Description: pylint: Constant name \"unused_variable\" doesn't conform to UPPER_CASE naming style.",
+          "fix": "Review and resolve the flagged issue at line 6: pylint: Constant name \"unused_variable\" doesn't conform to UPPER_CASE naming style.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 8,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "pylint: Use of eval",
+          "root_cause": "Static analysis identified a code issue at line 8. Description: pylint: Use of eval.",
+          "fix": "Review and resolve the flagged issue at line 8: pylint: Use of eval.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 10,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Constant name \"api_key\" doesn't conform to UPPER_CASE naming style",
+          "root_cause": "Static analysis identified a code issue at line 10. Description: pylint: Constant name \"api_key\" doesn't conform to UPPER_CASE naming style.",
+          "fix": "Review and resolve the flagged issue at line 10: pylint: Constant name \"api_key\" doesn't conform to UPPER_CASE naming style.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 12,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Import \"import os\" should be placed at the top of the module",
+          "root_cause": "Static analysis identified a code issue at line 12. Description: pylint: Import \"import os\" should be placed at the top of the module.",
+          "fix": "Review and resolve the flagged issue at line 12: pylint: Import \"import os\" should be placed at the top of the module.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 14,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Constant name \"x\" doesn't conform to UPPER_CASE naming style",
+          "root_cause": "Static analysis identified a code issue at line 14. Description: pylint: Constant name \"x\" doesn't conform to UPPER_CASE naming style.",
+          "fix": "Review and resolve the flagged issue at line 14: pylint: Constant name \"x\" doesn't conform to UPPER_CASE naming style.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 15,
+          "severity": "info",
+          "confidence": 0.8,
+          "issue": "pylint: Constant name \"y\" doesn't conform to UPPER_CASE naming style",
+          "root_cause": "Static analysis identified a code issue at line 15. Description: pylint: Constant name \"y\" doesn't conform to UPPER_CASE naming style.",
+          "fix": "Review and resolve the flagged issue at line 15: pylint: Constant name \"y\" doesn't conform to UPPER_CASE naming style.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 12,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "pylint: Unused import os",
+          "root_cause": "Static analysis identified a code issue at line 12. Description: pylint: Unused import os.",
+          "fix": "Review and resolve the flagged issue at line 12: pylint: Unused import os.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 3,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: expected 2 blank lines, found 1",
+          "root_cause": "Static analysis identified a code issue at line 3. Description: flake8: expected 2 blank lines, found 1.",
+          "fix": "Review and resolve the flagged issue at line 3: flake8: expected 2 blank lines, found 1.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 3,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: missing whitespace after ','",
+          "root_cause": "Static analysis identified a code issue at line 3. Description: flake8: missing whitespace after ','.",
+          "fix": "Review and resolve the flagged issue at line 3: flake8: missing whitespace after ','.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 4,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: indentation is not a multiple of 4",
+          "root_cause": "Static analysis identified a code issue at line 4. Description: flake8: indentation is not a multiple of 4.",
+          "fix": "Review and resolve the flagged issue at line 4: flake8: indentation is not a multiple of 4.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 6,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: expected 2 blank lines after class or function definition, found 1",
+          "root_cause": "Static analysis identified a code issue at line 6. Description: flake8: expected 2 blank lines after class or function definition, found 1.",
+          "fix": "Review and resolve the flagged issue at line 6: flake8: expected 2 blank lines after class or function definition, found 1.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 12,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: 'os' imported but unused",
+          "root_cause": "Static analysis identified a code issue at line 12. Description: flake8: 'os' imported but unused.",
+          "fix": "Review and resolve the flagged issue at line 12: flake8: 'os' imported but unused.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 12,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: module level import not at top of file",
+          "root_cause": "Static analysis identified a code issue at line 12. Description: flake8: module level import not at top of file.",
+          "fix": "Review and resolve the flagged issue at line 12: flake8: module level import not at top of file.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 14,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: missing whitespace around operator",
+          "root_cause": "Static analysis identified a code issue at line 14. Description: flake8: missing whitespace around operator.",
+          "fix": "Review and resolve the flagged issue at line 14: flake8: missing whitespace around operator.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 15,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: missing whitespace around operator",
+          "root_cause": "Static analysis identified a code issue at line 15. Description: flake8: missing whitespace around operator.",
+          "fix": "Review and resolve the flagged issue at line 15: flake8: missing whitespace around operator.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 16,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: whitespace after '('",
+          "root_cause": "Static analysis identified a code issue at line 16. Description: flake8: whitespace after '('.",
+          "fix": "Review and resolve the flagged issue at line 16: flake8: whitespace after '('.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 16,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: whitespace before ')'",
+          "root_cause": "Static analysis identified a code issue at line 16. Description: flake8: whitespace before ')'.",
+          "fix": "Review and resolve the flagged issue at line 16: flake8: whitespace before ')'.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 16,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "flake8: no newline at end of file",
+          "root_cause": "Static analysis identified a code issue at line 16. Description: flake8: no newline at end of file.",
+          "fix": "Review and resolve the flagged issue at line 16: flake8: no newline at end of file.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 1,
+          "severity": "medium",
+          "confidence": 0.8,
+          "issue": "bandit: Possible hardcoded password: '123456'",
+          "root_cause": "Static analysis identified a code issue at line 1. Description: bandit: Possible hardcoded password: '123456'.",
+          "fix": "Review and resolve the flagged issue at line 1: bandit: Possible hardcoded password: '123456'.",
+          "patch": "",
+          "issue_type": "code_smell",
+          "source": "llm"
+        },
+        {
+          "line": 8,
+          "severity": "high",
+          "confidence": 0.8,
+          "issue": "bandit: Use of possibly insecure function - consider using safer ast.literal_eval.",
+          "root_cause": "Static analysis identified a code issue at line 8. Description: bandit: Use of possibly insecure function - consider using safer ast.literal_eval..",
+          "fix": "Review and resolve the flagged issue at line 8: bandit: Use of possibly insecure function - consider using safer ast.literal_eval..",
+          "patch": "",
+          "issue_type": "bug",
+          "source": "llm"
+        }
+      ],
+      "ast_metadata": {
+        "functions": [
+          {
+            "type": "FunctionDef",
+            "name": "calc",
+            "start_line": 3,
+            "end_line": 4,
+            "args": [
+              "a",
+              "b"
+            ],
+            "has_docstring": false,
+            "is_async": false
+          }
+        ],
+        "complexity": {
+          "functions": [
+            {
+              "name": "calc",
+              "complexity": 1,
+              "rank": "A",
+              "start_line": 3,
+              "end_line": 4
+            }
+          ],
+          "maintainability_index": 70.04122987765201
+        }
+      },
+      "linter_findings": [
+        {
+          "rule": "W0311",
+          "message": "Bad indentation. Found 1 spaces, expected 4",
+          "line": 4,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0304",
+          "message": "Final newline missing",
+          "line": 16,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0114",
+          "message": "Missing module docstring",
+          "line": 1,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0103",
+          "message": "Constant name \"password\" doesn't conform to UPPER_CASE naming style",
+          "line": 1,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0116",
+          "message": "Missing function or method docstring",
+          "line": 3,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0103",
+          "message": "Constant name \"unused_variable\" doesn't conform to UPPER_CASE naming style",
+          "line": 6,
+          "tool": "pylint"
+        },
+        {
+          "rule": "W0123",
+          "message": "Use of eval",
+          "line": 8,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0103",
+          "message": "Constant name \"api_key\" doesn't conform to UPPER_CASE naming style",
+          "line": 10,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0413",
+          "message": "Import \"import os\" should be placed at the top of the module",
+          "line": 12,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0103",
+          "message": "Constant name \"x\" doesn't conform to UPPER_CASE naming style",
+          "line": 14,
+          "tool": "pylint"
+        },
+        {
+          "rule": "C0103",
+          "message": "Constant name \"y\" doesn't conform to UPPER_CASE naming style",
+          "line": 15,
+          "tool": "pylint"
+        },
+        {
+          "rule": "W0611",
+          "message": "Unused import os",
+          "line": 12,
+          "tool": "pylint"
+        },
+        {
+          "rule": "E302",
+          "message": "expected 2 blank lines, found 1",
+          "line": 3,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E231",
+          "message": "missing whitespace after ','",
+          "line": 3,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E111",
+          "message": "indentation is not a multiple of 4",
+          "line": 4,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E305",
+          "message": "expected 2 blank lines after class or function definition, found 1",
+          "line": 6,
+          "tool": "flake8"
+        },
+        {
+          "rule": "F401",
+          "message": "'os' imported but unused",
+          "line": 12,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E402",
+          "message": "module level import not at top of file",
+          "line": 12,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E225",
+          "message": "missing whitespace around operator",
+          "line": 14,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E225",
+          "message": "missing whitespace around operator",
+          "line": 15,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E201",
+          "message": "whitespace after '('",
+          "line": 16,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E202",
+          "message": "whitespace before ')'",
+          "line": 16,
+          "tool": "flake8"
+        },
+        {
+          "rule": "W292",
+          "message": "no newline at end of file",
+          "line": 16,
+          "tool": "flake8"
+        },
+        {
+          "rule": "B105",
+          "message": "Possible hardcoded password: '123456'",
+          "line": 1,
+          "tool": "bandit"
+        },
+        {
+          "rule": "B307",
+          "message": "Use of possibly insecure function - consider using safer ast.literal_eval.",
+          "line": 8,
+          "tool": "bandit"
+        }
+      ]
+    }
+  ],
+  "summary_stats": {
+    "total_issues": 26,
+    "by_severity": {
+      "critical": 0,
+      "high": 2,
+      "medium": 15,
+      "low": 0,
+      "info": 9
+    },
+    "by_source": {
+      "llm": 26,
+      "linter": 0
+    },
+    "avg_confidence": 0.8
+  },
+  "evaluation_metrics": {},
+  "trace_id": "82ad96c1-eaba-4a6b-a990-7c6b640a3b2c"
+}
