@@ -1,1 +1,0 @@
-"""Diff processing module."""
