@@ -7,12 +7,32 @@ class ImportAnalyzer(ast.NodeVisitor):
     DANGEROUS_IMPORTS = {
         "subprocess",
         "pickle",
+        "marshal",
         "ctypes",
-        "shutil",
+        "shelve",
+        "dill"
+    }
+
+    DANGEROUS_COMPONENTS = {
         "os.system",
-        "sys",
-        "builtins",
-        "socket"
+        "os.popen",
+        "os.spawn",
+        "os.spawnl",
+        "os.spawnle",
+        "os.spawnlp",
+        "os.spawnlpe",
+        "os.spawnv",
+        "os.spawnve",
+        "os.spawnvp",
+        "os.spawnvpe",
+        "os.execl",
+        "os.execle",
+        "os.execlp",
+        "os.execlpe",
+        "os.execv",
+        "os.execve",
+        "os.execvp",
+        "os.execvpe"
     }
 
     def __init__(self):
@@ -43,7 +63,12 @@ class ImportAnalyzer(ast.NodeVisitor):
             })
         for alias in node.names:
             full_name = f"{module}.{alias.name}"
-            if full_name in self.DANGEROUS_IMPORTS or alias.name in self.DANGEROUS_IMPORTS:
+            if (
+                full_name in self.DANGEROUS_IMPORTS 
+                or alias.name in self.DANGEROUS_IMPORTS
+                or full_name in self.DANGEROUS_COMPONENTS
+                or alias.name in self.DANGEROUS_COMPONENTS
+            ):
                 self.dangerous_calls.append({
                     "line": node.lineno,
                     "module": full_name,

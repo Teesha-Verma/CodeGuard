@@ -89,7 +89,17 @@ class TestGroundingNoFalsePositives:
 
     def test_safe_import_no_dangerous(self):
         analyzer = ImportAnalyzer()
-        result = analyzer.analyze(SAFE_IMPORT)
+        # Clean safe imports that should never trigger dangerous imports
+        safe_code = """
+import sys
+import typing
+import pathlib
+import json
+import collections
+import os
+from collections import defaultdict
+"""
+        result = analyzer.analyze(safe_code)
         assert result["dangerous_imports"] == []
 
     def test_safe_scope_no_shadowing(self):
@@ -130,10 +140,22 @@ class TestGroundingKnownBugs:
         assert any(f["pattern"] == "global_modification" for f in findings)
 
     def test_dangerous_import_detected(self):
-        code = "import subprocess\nimport pickle\n"
+        code = """
+import subprocess
+import pickle
+import marshal
+import ctypes
+from os import system
+"""
         analyzer = ImportAnalyzer()
         result = analyzer.analyze(code)
-        assert len(result["dangerous_imports"]) >= 2
+        assert len(result["dangerous_imports"]) == 5
+        modules = [x["module"] for x in result["dangerous_imports"]]
+        assert "subprocess" in modules
+        assert "pickle" in modules
+        assert "marshal" in modules
+        assert "ctypes" in modules
+        assert "os.system" in modules
 
     def test_shared_mutable_class_state_detected(self):
         code = "class BadConfig:\n    items = []\n"
