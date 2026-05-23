@@ -126,8 +126,16 @@ class ConfidenceEngine:
             score = 0.15
             reasons = ["Assert statements in test files are standard practices. Confidence heavily reduced."]
 
-        # ── Clamp to [0.10, 1.00] ────────────────────────────────
-        final_score = round(max(0.10, min(1.0, score)), 2)
+        # ── Clamp to confidence ceiling (Phase 4 Refinement) ──────
+        max_limit = 0.95
+        if signal_meta.get("is_low_signal"):
+            max_limit = 0.60
+            if "Low-signal penalty" not in "".join(reasons):
+                reasons.append("Low-signal finding: confidence capped at 0.60.")
+            else:
+                reasons.append("Confidence capped at 0.60 due to low-signal category.")
+
+        final_score = round(max(0.10, min(max_limit, score)), 2)
 
         # ── Strength label ───────────────────────────────────────
         if final_score >= 0.85:

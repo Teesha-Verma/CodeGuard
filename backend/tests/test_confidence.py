@@ -59,7 +59,7 @@ def test_ast_with_evidence_validation():
 
 
 def test_full_evidence_stack():
-    """All signals → base (0.40) + single (0.20) + multi (0.15) + AST (0.25) = 1.00 (capped)."""
+    """All signals → base (0.40) + single (0.20) + multi (0.15) + AST (0.25) = 1.10 → capped at 0.95."""
     result = ConfidenceEngine.calculate(
         finding={"line": 10, "issue": "test"},
         raw_sources=["bandit", "pylint", "ast"],
@@ -69,13 +69,12 @@ def test_full_evidence_stack():
             "trigger_lines": [10]
         }
     )
-    # 0.40 + 0.20 + 0.15 + 0.25 + 0.10 = 1.10 → capped at 1.0
-    assert result["confidence"] == 1.0
+    assert result["confidence"] == 0.95
     assert result["evidence_strength"] == "strong"
 
 
 def test_score_never_exceeds_one():
-    """Verify the cap is enforced regardless of input."""
+    """Verify the cap of 0.95 is enforced regardless of input."""
     result = ConfidenceEngine.calculate(
         finding={"line": 1},
         raw_sources=["bandit", "pylint", "flake8", "ast"],
@@ -85,7 +84,23 @@ def test_score_never_exceeds_one():
             "trigger_lines": [1]
         }
     )
-    assert result["confidence"] <= 1.0
+    assert result["confidence"] <= 0.95
+
+
+def test_confidence_low_signal_cap():
+    """Verify low signal findings are capped at 0.60."""
+    result = ConfidenceEngine.calculate(
+        finding={"line": 1},
+        raw_sources=["bandit"],
+        evidence={
+            "ast_nodes": [],
+            "linter_rules": [{"tool": "bandit"}],
+            "trigger_lines": [1]
+        },
+        signal_meta={"is_low_signal": True}
+    )
+    assert result["confidence"] <= 0.60
+    assert any("capped at 0.60" in r or "Capped" in r for r in result["reasons"])
 
 
 def test_linter_evidence_validation_bonus():

@@ -138,8 +138,8 @@ def test_combined_calibrations():
         signal_meta={"signal_priority": "high", "is_low_signal": False, "issue_category": "security"},
     )
     # base(0.40) + linter(0.20) + ast(0.25) + evidence(0.10) + high_priority(0.15)
-    # + high_precision(0.15) = 1.25 → capped to 1.0
-    assert result["confidence"] == 1.0
+    # + high_precision(0.15) = 1.25 → capped to 0.95
+    assert result["confidence"] == 0.95
     assert result["evidence_strength"] == "strong"
 
 
