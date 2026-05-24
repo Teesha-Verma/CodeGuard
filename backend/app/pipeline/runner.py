@@ -69,7 +69,7 @@ def run_snippet_review_task(review_id: str, code: str, language: str, filename: 
             review_id=review_id,
             file_reports=[file_report],
             summary_stats=summary_stats,
-            evaluation_metrics={},
+            evaluation_metrics=None,
             trace_id=review_id
         )
         
@@ -223,7 +223,7 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
             review_id=review_id,
             file_reports=file_reports,
             summary_stats=summary_stats,
-            evaluation_metrics={},
+            evaluation_metrics=None,
             trace_id=review_id
         )
         

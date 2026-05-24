@@ -65,13 +65,14 @@ def test_import_detection():
 def test_summary_stats_empty():
     stats = MetricsCalculator.compute_summary_stats([])
     assert stats["total_issues"] == 0
-    assert stats["avg_confidence"] == 0.0
+    assert stats["avg_confidence"] is None
+    assert stats["evaluation_available"] is False
 
 def test_summary_stats_with_issues():
     issues = [
         {"severity": "high", "source": "llm", "confidence": 0.9},
         {"severity": "medium", "source": "linter", "confidence": 0.7},
-        {"severity": "critical", "source": "llm", "confidence": 0.95},
+        {"thought": "", "severity": "critical", "source": "llm", "confidence": 0.95},
     ]
     stats = MetricsCalculator.compute_summary_stats(issues)
     
@@ -81,3 +82,4 @@ def test_summary_stats_with_issues():
     assert stats["by_source"]["llm"] == 2
     assert stats["by_source"]["linter"] == 1
     assert stats["avg_confidence"] == round((0.9 + 0.7 + 0.95) / 3, 2)
+    assert stats["evaluation_available"] is True

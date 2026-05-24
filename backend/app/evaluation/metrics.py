@@ -1,20 +1,27 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 class MetricsCalculator:
     """Calculates review-level statistics and evaluation metrics."""
     
     @staticmethod
     def compute_summary_stats(issues: List[Dict[str, Any]]) -> Dict[str, Any]:
-        stats = {
+        if not issues:
+            return {
+                "total_issues": 0,
+                "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
+                "by_source": {},
+                "avg_confidence": None,
+                "evaluation_available": False
+            }
+
+        stats: Dict[str, Any] = {
             "total_issues": len(issues),
             "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
             "by_source": {},
-            "avg_confidence": 0.0
+            "avg_confidence": 0.0,
+            "evaluation_available": True
         }
         
-        if not issues:
-            return stats
-            
         total_conf = 0.0
         for issue in issues:
             # Map severity
@@ -44,3 +51,4 @@ class MetricsCalculator:
             
         stats["avg_confidence"] = round(total_conf / len(issues), 2)
         return stats
+
