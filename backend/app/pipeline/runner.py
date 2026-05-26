@@ -54,13 +54,13 @@ def run_snippet_review_task(review_id: str, code: str, language: str, filename: 
                 output_data=trace["output_data"]
             )
         
-        # Calculate summary statistics
         raw_issues = []
         for issue in file_report.issues:
             raw_issues.append({
                 "severity": issue.severity,
                 "confidence": issue.confidence,
-                "sources": issue.sources
+                "sources": issue.sources,
+                "is_low_signal": issue.is_low_signal
             })
         summary_stats = MetricsCalculator.compute_summary_stats(raw_issues)
         
@@ -213,7 +213,8 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
                 all_raw_issues.append({
                     "severity": issue.severity,
                     "confidence": issue.confidence,
-                    "sources": issue.sources
+                    "sources": issue.sources,
+                    "is_low_signal": issue.is_low_signal
                 })
                 
         summary_stats = MetricsCalculator.compute_summary_stats(all_raw_issues)

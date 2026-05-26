@@ -35,17 +35,51 @@ class ReviewIssue(BaseModel):
 
 class FileReport(BaseModel):
     file_path: str = Field(..., description="Path to the reviewed file")
-    issues: List[ReviewIssue] = Field(default_factory=list, description="List of detected issues in this file")
+    issues: List[ReviewIssue] = Field(default_factory=list, description="List of all detected issues in this file")
+    meaningful_issues: List[ReviewIssue] = Field(default_factory=list, description="List of high-confidence, safety-critical issues")
+    style_findings: List[ReviewIssue] = Field(default_factory=list, description="List of low-signal or style-only findings")
+    suppressed_findings: List[ReviewIssue] = Field(default_factory=list, description="List of contextually suppressed or extremely low confidence findings")
     ast_metadata: Optional[Dict[str, Any]] = Field(None, description="Extracted AST structural metadata")
     ast_summary: Optional[Dict[str, Any]] = Field(None, description="Summarized AST metadata")
     linter_findings: Optional[List[Dict[str, Any]]] = Field(None, description="Raw linter findings for this file")
 
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Automatically split findings if issues is populated but sub-lists are empty
+        if self.issues and not (self.meaningful_issues or self.style_findings or self.suppressed_findings):
+            # Clear them first to avoid duplicating on re-init
+            self.meaningful_issues = []
+            self.style_findings = []
+            self.suppressed_findings = []
+            for issue in self.issues:
+                if issue.confidence < 0.3:
+                    self.suppressed_findings.append(issue)
+                elif issue.is_low_signal:
+                    self.style_findings.append(issue)
+                else:
+                    self.meaningful_issues.append(issue)
+
 class ReviewReport(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")
     file_reports: List[FileReport] = Field(default_factory=list, description="List of file reports")
+    meaningful_issues: List[ReviewIssue] = Field(default_factory=list, description="Aggregated high-confidence, safety-critical issues across files")
+    style_findings: List[ReviewIssue] = Field(default_factory=list, description="Aggregated low-signal or style-only findings across files")
+    suppressed_findings: List[ReviewIssue] = Field(default_factory=list, description="Aggregated contextually suppressed findings across files")
     summary_stats: Dict[str, Any] = Field(default_factory=dict, description="Aggregated statistics of the review")
     evaluation_metrics: Optional[Dict[str, Any]] = Field(None, description="Evaluation metrics (if ground truth is available or for benchmark comparisons)")
     trace_id: str = Field(..., description="Trace identifier for logs")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Automatically aggregate across all file reports
+        if self.file_reports and not (self.meaningful_issues or self.style_findings or self.suppressed_findings):
+            self.meaningful_issues = []
+            self.style_findings = []
+            self.suppressed_findings = []
+            for report in self.file_reports:
+                self.meaningful_issues.extend(report.meaningful_issues)
+                self.style_findings.extend(report.style_findings)
+                self.suppressed_findings.extend(report.suppressed_findings)
 
 class ReviewStatusResponse(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")

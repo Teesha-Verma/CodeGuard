@@ -8,14 +8,36 @@ class MetricsCalculator:
         if not issues:
             return {
                 "total_issues": 0,
+                "meaningful_issues": 0,
+                "style_findings": 0,
+                "suppressed_findings": 0,
                 "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
                 "by_source": {},
                 "avg_confidence": None,
                 "evaluation_available": False
             }
 
+        meaningful_count = 0
+        style_count = 0
+        suppressed_count = 0
+
+        for issue in issues:
+            conf = float(issue.get("confidence", 0.0))
+            is_low = bool(issue.get("is_low_signal", False))
+            
+            # Contextual or absolute low confidence constitutes a suppressed finding
+            if conf < 0.3:
+                suppressed_count += 1
+            elif is_low:
+                style_count += 1
+            else:
+                meaningful_count += 1
+
         stats: Dict[str, Any] = {
-            "total_issues": len(issues),
+            "total_issues": meaningful_count,  # NOT inflated! Only counts meaningful safety-critical issues
+            "meaningful_issues": meaningful_count,
+            "style_findings": style_count,
+            "suppressed_findings": suppressed_count,
             "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
             "by_source": {},
             "avg_confidence": 0.0,
