@@ -55,7 +55,8 @@ def run_snippet_review_task(review_id: str, code: str, language: str, filename: 
             )
         
         raw_issues = []
-        for issue in file_report.issues:
+        all_report_issues = file_report.meaningful_issues + file_report.style_findings + file_report.suppressed_findings
+        for issue in all_report_issues:
             raw_issues.append({
                 "severity": issue.severity,
                 "confidence": issue.confidence,
@@ -211,7 +212,8 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
         # Calculate summary statistics
         all_raw_issues = []
         for file_report in file_reports:
-            for issue in file_report.issues:
+            all_report_issues = file_report.meaningful_issues + file_report.style_findings + file_report.suppressed_findings
+            for issue in all_report_issues:
                 all_raw_issues.append({
                     "severity": issue.severity,
                     "confidence": issue.confidence,

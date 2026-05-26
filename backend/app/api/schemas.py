@@ -47,17 +47,19 @@ class FileReport(BaseModel):
         super().__init__(**data)
         # Automatically split findings if issues is populated but sub-lists are empty
         if self.issues and not (self.meaningful_issues or self.style_findings or self.suppressed_findings):
-            # Clear them first to avoid duplicating on re-init
+            raw_issues = self.issues
             self.meaningful_issues = []
             self.style_findings = []
             self.suppressed_findings = []
-            for issue in self.issues:
+            for issue in raw_issues:
                 if issue.confidence < 0.3:
                     self.suppressed_findings.append(issue)
                 elif issue.is_low_signal:
                     self.style_findings.append(issue)
                 else:
                     self.meaningful_issues.append(issue)
+            # Enforce strict V1 behavior: issues field ONLY contains meaningful safety-critical findings
+            self.issues = self.meaningful_issues
 
 class ReviewReport(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")
