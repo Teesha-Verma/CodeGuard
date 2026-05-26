@@ -420,48 +420,48 @@ class ReviewGenerator:
         line = finding.get("line", 1)
         
         # Defaults
-        root_cause = f"Style/formatting warning on line {line}: {msg}."
-        trigger_condition = f"Triggers when scanning standard formatting/lint constraints."
-        fix = "Adhere to the standard style conventions by adjusting the line."
+        root_cause = f"A minor style warning was flagged on line {line}: {msg}."
+        trigger_condition = "This is triggered to capture style-only issues that do not affect runtime execution."
+        fix = f"Refactor the code on line {line} to satisfy general static analysis rules."
         
         # 1. Line too long (E501 / C0301)
         if "E501" in rule or "C0301" in rule or "line too long" in msg.lower():
             limit_info = ""
             if ">" in msg:
                 limit_info = f" ({msg.split('>')[-1].strip()} characters)"
-            root_cause = f"Line {line} exceeds the maximum character length recommendation{limit_info}. Very long lines hinder code readability and scanning."
-            trigger_condition = f"Line exceeds the configured maximum character length."
-            fix = "Refactor the line by extracting sub-expressions, splitting long string literals, or wrapping parameter lists."
+            root_cause = f"Line {line} stretches too far horizontally{limit_info}, which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult."
+            trigger_condition = "This rule is triggered when a single line of code exceeds the recommended character limit."
+            fix = "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation."
             
         # 2. Whitespace / Indentation / Empty lines
         elif any(x in rule for x in ("E301", "E302", "E303", "E305", "E2", "W291", "W292", "W293", "W391", "C0303", "C0325", "C0326", "C0304", "C0305")):
-            root_cause = f"Inconsistent spacing, indentation, or trailing whitespace on line {line}."
-            trigger_condition = "Whitespace characters do not match standardized PEP-8 style constraints."
-            fix = "Clean trailing whitespaces or adjust the indentation of block statements to align with PEP-8 guidelines."
+            root_cause = f"Line {line} contains minor spacing anomalies, such as extra whitespace, incorrect operator padding, or trailing spaces."
+            trigger_condition = "Triggered by whitespace characters that deviate from standard code formatting guidelines."
+            fix = "Remove the trailing whitespace or adjust spacing around operators and block boundaries to restore standard style compliance."
             
         # 3. Missing docstrings
         elif any(x in rule for x in ("C0114", "C0115", "C0116")):
-            root_cause = f"Documenting public interfaces, classes, or modules provides vital context for maintenance."
-            trigger_condition = "Public class, function, or module is missing a corresponding docstring."
-            fix = "Add a concise docstring summarizing the purpose, arguments, and return types of the module/class/function."
-
+            root_cause = f"The public interface, class, or function on line {line} is undocumented. Adding clear docstrings makes the API easier for others to understand and use."
+            trigger_condition = "This warning flags public declarations that are missing descriptive docstrings."
+            fix = "Add a concise docstring that explains the component's purpose, its input parameters, and its return values."
+ 
         # 4. Radon Nesting / Heuristics
         elif "NESTING" in rule or "nesting" in msg.lower():
-            root_cause = f"Nesting depth on line {line} is high. Deep nesting significantly increases cognitive load and decreases maintainability."
-            trigger_condition = "Block nesting depth exceeds recommended static limit."
-            fix = "Flatten nested structures by returning early (guard clauses) or refactoring deep blocks into separate, focused helper functions."
+            root_cause = f"Line {line} has deeply nested logical blocks. This increases cognitive complexity and makes following execution flows significantly harder."
+            trigger_condition = "This warning is raised when block nesting levels exceed the recommended complexity threshold."
+            fix = "Simplify the structure by returning early with guard clauses or refactoring the deeply nested sections into separate helper methods."
             
         # 5. Shadowing (when suppressed / low confidence)
         elif "SHADOWING" in rule or "shadow" in msg.lower():
-            root_cause = f"A local identifier on line {line} has the same name as a built-in or global variable."
-            trigger_condition = "Local variable definition shadows a symbol from outer scopes."
-            fix = "Rename the local variable to avoid namespace collisions and prevent potential dynamic runtime reference bugs."
+            root_cause = f"A variable definition on line {line} overrides or shadows an existing identifier from a higher scope or built-in namespace."
+            trigger_condition = "Occurs when a local variable shares a name with a symbol in an outer scope, leading to potential namespace confusion."
+            fix = "Rename the local variable to a more specific name to avoid shadowing outer scopes and protect against unintended scope bugs."
             
         # 6. Global modification
         elif "GLOBAL" in rule or "global" in msg.lower():
-            root_cause = f"Modifying global state directly inside functions creates hidden side-effects and reduces code modularity."
-            trigger_condition = "Function alters global scope variable using the 'global' declaration."
-            fix = "Pass the variable as an argument and return the updated value, ensuring pure function boundaries."
+            root_cause = f"Line {line} modifies a global variable. Mutating global variables directly introduces hidden state modifications and hampers testability."
+            trigger_condition = "Triggered when the 'global' keyword is utilized to mutate state outside the local function context."
+            fix = "Re-architect the function to accept the global value as an argument and return the new value, keeping state mutations localized."
             
         return {
             "root_cause": root_cause,
