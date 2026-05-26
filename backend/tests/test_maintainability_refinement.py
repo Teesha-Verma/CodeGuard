@@ -30,10 +30,10 @@ class UserSchema:
         res_decl = analyzer.analyze(complex_schema_code, "app/schemas/user_schema.py")
         assert res_decl["mi_exceeds_threshold"] is True
         assert "mi_interpretation" in res_decl
-        assert "structural abstractions or configurations" in res_decl["mi_interpretation"]
-        assert "No critical refactoring is recommended" in res_decl["mi_interpretation"]
-        assert "cognitive density" not in res_decl["mi_interpretation"]
-        assert "lower maintainability" not in res_decl["mi_interpretation"]
+        assert res_decl["mi_interpretation"] == (
+            "This file contains a large number of framework abstractions and helper methods, "
+            "which lowers maintainability metrics."
+        )
     finally:
         settings.MAINTAINABILITY_INDEX_MIN = old_mi_min
 

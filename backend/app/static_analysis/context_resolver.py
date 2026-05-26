@@ -56,7 +56,7 @@ class ContextResolver:
 
         # 5. Declarative/Schema File Heuristics (Phase 3)
         is_declarative_file = False
-        declarative_keywords = ("typeddict", "protocol", "basemodel", "schema", "interface", "wrapper", "types")
+        declarative_keywords = ("typeddict", "protocol", "basemodel", "schema", "interface", "wrapper", "types", "dto", "serializer", "adapter", "model", "pydantic")
         if any(kw in norm_path for kw in declarative_keywords):
             is_declarative_file = True
         elif code:

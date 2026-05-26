@@ -71,9 +71,8 @@ class ComplexityAnalyzer:
                 
                 if is_declarative:
                     result["mi_interpretation"] = (
-                        f"This file contains structural abstractions or configurations (MI={mi_score:.1f}). "
-                        f"While the structural density is higher, this is typical for schemas, configurations, "
-                        f"or adapters. No critical refactoring is recommended."
+                        "This file contains a large number of framework abstractions and helper methods, "
+                        "which lowers maintainability metrics."
                     )
                 else:
                     result["mi_interpretation"] = (

@@ -112,10 +112,10 @@ class UserDTO(TypedDict):
         res = analyzer.analyze(code, file_path)
         assert res["mi_exceeds_threshold"] is True
         assert "mi_interpretation" in res
-        assert "structural abstractions or configurations" in res["mi_interpretation"]
-        assert "No critical refactoring is recommended" in res["mi_interpretation"]
-        assert "cognitive density" not in res["mi_interpretation"]
-        assert "lower maintainability" not in res["mi_interpretation"]
+        assert res["mi_interpretation"] == (
+            "This file contains a large number of framework abstractions and helper methods, "
+            "which lowers maintainability metrics."
+        )
     finally:
         settings.MAINTAINABILITY_INDEX_MIN = old_mi_min
 
