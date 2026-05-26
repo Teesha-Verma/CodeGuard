@@ -282,22 +282,7 @@ class ReviewGenerator:
                 else:
                     evidence_strength = max(linter_strengths)
 
-            # B: Conditionally activate AI reasoning
-            reasoning_activated = evidence_strength >= threshold
-            if reasoning_activated:
-                ai_details = self.root_cause_engine.analyze_finding(finding, aggregated)
-                reasoning_source = "llm"
-            else:
-                ai_details = {
-                    "root_cause": f"Deterministic static analysis detected a style/formatting finding: {finding.get('issue')}.",
-                    "trigger_condition": "Triggers statically during code scanning.",
-                    "fix": "Format the code or modify style to adhere to conventions.",
-                    "patch": None,
-                    "issue_type": finding.get("issue_type", "style")
-                }
-                reasoning_source = "static_analysis"
-
-            # Resolve primary source and rule for prioritization
+            # Resolve primary source and rule for prioritization and static explanations
             primary_source = "ast"
             primary_rule = ""
             primary_msg = finding["issue"]
@@ -312,7 +297,16 @@ class ReviewGenerator:
                 primary_source = "ast"
                 primary_rule = node_obj.get("pattern", node_obj.get("rule_name", ""))
                 primary_msg = node_obj.get("message", finding["issue"])
-                
+
+            # B: Conditionally activate AI reasoning
+            reasoning_activated = evidence_strength >= threshold
+            if reasoning_activated:
+                ai_details = self.root_cause_engine.analyze_finding(finding, aggregated)
+                reasoning_source = "llm"
+            else:
+                ai_details = self._generate_static_explanation(finding, primary_rule, primary_msg)
+                reasoning_source = "static_analysis"
+
             priority_info = PrioritizationEngine.analyze(
                 source=primary_source,
                 rule_id=primary_rule,
@@ -419,3 +413,60 @@ class ReviewGenerator:
         # Sort issues descending by priority score
         final_issues.sort(key=lambda x: x.priority_score, reverse=True)
         return final_issues
+
+    def _generate_static_explanation(self, finding: Dict[str, Any], primary_rule: str, primary_msg: str) -> Dict[str, Any]:
+        rule = str(primary_rule).upper()
+        msg = str(primary_msg)
+        line = finding.get("line", 1)
+        
+        # Defaults
+        root_cause = f"Style/formatting warning on line {line}: {msg}."
+        trigger_condition = f"Triggers when scanning standard formatting/lint constraints."
+        fix = "Adhere to the standard style conventions by adjusting the line."
+        
+        # 1. Line too long (E501 / C0301)
+        if "E501" in rule or "C0301" in rule or "line too long" in msg.lower():
+            limit_info = ""
+            if ">" in msg:
+                limit_info = f" ({msg.split('>')[-1].strip()} characters)"
+            root_cause = f"Line {line} exceeds the maximum character length recommendation{limit_info}. Very long lines hinder code readability and scanning."
+            trigger_condition = f"Line exceeds the configured maximum character length."
+            fix = "Refactor the line by extracting sub-expressions, splitting long string literals, or wrapping parameter lists."
+            
+        # 2. Whitespace / Indentation / Empty lines
+        elif any(x in rule for x in ("E301", "E302", "E303", "E305", "E2", "W291", "W292", "W293", "W391", "C0303", "C0325", "C0326", "C0304", "C0305")):
+            root_cause = f"Inconsistent spacing, indentation, or trailing whitespace on line {line}."
+            trigger_condition = "Whitespace characters do not match standardized PEP-8 style constraints."
+            fix = "Clean trailing whitespaces or adjust the indentation of block statements to align with PEP-8 guidelines."
+            
+        # 3. Missing docstrings
+        elif any(x in rule for x in ("C0114", "C0115", "C0116")):
+            root_cause = f"Documenting public interfaces, classes, or modules provides vital context for maintenance."
+            trigger_condition = "Public class, function, or module is missing a corresponding docstring."
+            fix = "Add a concise docstring summarizing the purpose, arguments, and return types of the module/class/function."
+
+        # 4. Radon Nesting / Heuristics
+        elif "NESTING" in rule or "nesting" in msg.lower():
+            root_cause = f"Nesting depth on line {line} is high. Deep nesting significantly increases cognitive load and decreases maintainability."
+            trigger_condition = "Block nesting depth exceeds recommended static limit."
+            fix = "Flatten nested structures by returning early (guard clauses) or refactoring deep blocks into separate, focused helper functions."
+            
+        # 5. Shadowing (when suppressed / low confidence)
+        elif "SHADOWING" in rule or "shadow" in msg.lower():
+            root_cause = f"A local identifier on line {line} has the same name as a built-in or global variable."
+            trigger_condition = "Local variable definition shadows a symbol from outer scopes."
+            fix = "Rename the local variable to avoid namespace collisions and prevent potential dynamic runtime reference bugs."
+            
+        # 6. Global modification
+        elif "GLOBAL" in rule or "global" in msg.lower():
+            root_cause = f"Modifying global state directly inside functions creates hidden side-effects and reduces code modularity."
+            trigger_condition = "Function alters global scope variable using the 'global' declaration."
+            fix = "Pass the variable as an argument and return the updated value, ensuring pure function boundaries."
+            
+        return {
+            "root_cause": root_cause,
+            "trigger_condition": trigger_condition,
+            "fix": fix,
+            "patch": None,
+            "issue_type": finding.get("issue_type", "style")
+        }

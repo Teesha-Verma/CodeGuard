@@ -60,4 +60,4 @@ def test_reasoning_activation_bypass():
     assert len(issues) == 1
     issue = issues[0]
     assert issue.reasoning_source == "static_analysis"
-    assert "style/formatting" in issue.root_cause
+    assert "exceeds the maximum character length recommendation" in issue.root_cause
