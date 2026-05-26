@@ -144,16 +144,6 @@ class PipelineOrchestrator:
             "dangerous_patterns": dangerous_patterns_count
         }
 
-        # Verbose AST metadata appears ONLY when requested, or debug/developer mode is enabled
-        from app.core.config import get_settings
-        settings = get_settings()
-        debug_or_dev_enabled = (
-            settings.DEBUG 
-            or os.environ.get("DEVELOPER_MODE", "").lower() == "true"
-            or os.environ.get("DEBUG_MODE", "").lower() == "true"
-        )
-        verbose_final = verbose_ast or debug_or_dev_enabled
-
         return FileReport(
             file_path=diff_file.file_path,
             issues=final_issues,
@@ -162,7 +152,7 @@ class PipelineOrchestrator:
                 "classes": ast_meta.get("classes", []),
                 "complexity": comp,
                 "dangerous_calls": import_issues.get("dangerous_imports", [])
-            } if verbose_final else None,
+            } if verbose_ast else None,
             ast_summary=summary,
             linter_findings=[{
                 "rule": f.rule_id,
