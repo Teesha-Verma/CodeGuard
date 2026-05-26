@@ -14,12 +14,17 @@ class MetricsCalculator:
                 "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
                 "by_source": {},
                 "avg_confidence": None,
+                "avg_meaningful_confidence": None,
+                "avg_style_confidence": None,
                 "evaluation_available": False
             }
 
         meaningful_count = 0
         style_count = 0
         suppressed_count = 0
+
+        meaningful_total_conf = 0.0
+        style_total_conf = 0.0
 
         for issue in issues:
             conf = float(issue.get("confidence", 0.0))
@@ -30,8 +35,10 @@ class MetricsCalculator:
                 suppressed_count += 1
             elif is_low:
                 style_count += 1
+                style_total_conf += conf
             else:
                 meaningful_count += 1
+                meaningful_total_conf += conf
 
         stats: Dict[str, Any] = {
             "total_issues": meaningful_count,  # NOT inflated! Only counts meaningful safety-critical issues
@@ -43,10 +50,11 @@ class MetricsCalculator:
             "detection_sources": {},
             "reasoning_sources": {},
             "avg_confidence": 0.0,
+            "avg_meaningful_confidence": None,
+            "avg_style_confidence": None,
             "evaluation_available": True
         }
         
-        total_conf = 0.0
         for issue in issues:
             # Map severity
             sev = issue.get("severity")
@@ -88,8 +96,13 @@ class MetricsCalculator:
                 
             stats["reasoning_sources"][reas_src] = stats["reasoning_sources"].get(reas_src, 0) + 1
                 
-            total_conf += float(issue.get("confidence", 0.0))
-            
-        stats["avg_confidence"] = round(total_conf / len(issues), 2)
+        avg_meaningful = round(meaningful_total_conf / meaningful_count, 2) if meaningful_count > 0 else None
+        avg_style = round(style_total_conf / style_count, 2) if style_count > 0 else None
+        
+        stats["avg_meaningful_confidence"] = avg_meaningful
+        stats["avg_style_confidence"] = avg_style
+        
+        # Set avg_confidence to avg_meaningful_confidence (or avg_style if no meaningful issues exist) to avoid linter style noise
+        stats["avg_confidence"] = avg_meaningful if avg_meaningful is not None else avg_style
         return stats
 
