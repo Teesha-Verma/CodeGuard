@@ -150,3 +150,111 @@ def run_ping():
     res = parser.parse(safe_sub, [])
     sub_findings = [f for f in res["ast_rules_findings"] if f["rule_name"] == "unsafe_subprocess"]
     assert len(sub_findings) == 0
+
+
+# =====================================================================
+# 5. REGRESSION VALIDATION AND SIZING TESTS (Phase 6)
+# =====================================================================
+
+def test_payload_size_checking():
+    # Verify that payload sizes are strictly minimized when verbose_ast=False
+    from app.api.schemas import FileReport, ReviewIssue
+    
+    # Simulate a file report with issues and verbose_ast disabled
+    file_report = FileReport(
+        file_path="app/main.py",
+        status="completed",
+        issues=[],
+        meaningful_issues=[],
+        style_findings=[],
+        suppressed_findings=[],
+        verbose_ast=False,
+        ast_metadata=None
+    )
+    
+    payload = file_report.model_dump()
+    assert "ast_metadata" in payload
+    assert payload["ast_metadata"] is None
+
+
+def test_style_only_pr_review():
+    # Verify that style-only findings are correctly classified and separated in reports
+    from app.api.schemas import FileReport, ReviewIssue
+    
+    issue_style = ReviewIssue(
+        line=10,
+        severity="low",
+        confidence=0.8,
+        issue="line too long",
+        root_cause="Style warning",
+        trigger_condition="Exceeds limit",
+        fix="Wrap line",
+        issue_type="style",
+        sources=["flake8"],
+        reasoning_trace=[],
+        evidence={"ast_nodes": [], "linter_rules": []},
+        is_low_signal=True,
+        detection_source="flake8",
+        reasoning_source="static_analysis",
+        priority_score=0.2,
+        detection_sources=["flake8"]
+    )
+    
+    file_report = FileReport(
+        file_path="app/main.py",
+        status="completed",
+        issues=[issue_style]
+    )
+    
+    # The issues list should ONLY contain meaningful safety-critical issues, so it must be empty
+    assert len(file_report.issues) == 0
+    assert len(file_report.meaningful_issues) == 0
+    assert len(file_report.style_findings) == 1
+    assert file_report.style_findings[0].issue == "line too long"
+
+
+def test_empty_meaningful_output():
+    # Verify summary statistics work when there are no meaningful issues but style is present
+    from app.evaluation.metrics import MetricsCalculator
+    
+    issues = [
+        {"severity": "low", "confidence": 0.50, "is_low_signal": True},        # Style
+        {"severity": "info", "confidence": 0.20, "is_low_signal": False},       # Suppressed (conf < 0.3)
+    ]
+    
+    stats = MetricsCalculator.compute_summary_stats(issues)
+    
+    assert stats["total_issues"] == 0
+    assert stats["meaningful_issues"] == 0
+    assert stats["style_findings"] == 1
+    assert stats["suppressed_findings"] == 1
+    assert stats["avg_meaningful_confidence"] is None
+    assert stats["avg_style_confidence"] == 0.50
+    # avg_confidence falls back to average style confidence when no meaningful issues exist
+    assert stats["avg_confidence"] == 0.50
+
+
+def test_abstraction_heavy_file_maintainability():
+    # Verify that abstraction-heavy and schema classes output tailored wording
+    from app.static_analysis.complexity_analyzer import ComplexityAnalyzer
+    from app.core.config import get_settings
+    
+    code = """from typing import TypedDict, Optional
+    
+class PaymentAdapter(TypedDict):
+    transaction_id: str
+    amount: float
+    status: Optional[str]
+    metadata: dict
+"""
+    analyzer = ComplexityAnalyzer()
+    settings = get_settings()
+    old_mi_min = settings.MAINTAINABILITY_INDEX_MIN
+    settings.MAINTAINABILITY_INDEX_MIN = 101  # Guarantee breach
+    
+    try:
+        res = analyzer.analyze(code, "app/adapters/payment_adapter.py")
+        assert res["mi_exceeds_threshold"] is True
+        assert res["mi_interpretation"] == "This file contains a large number of framework abstractions and helper methods, which lowers maintainability metrics."
+    finally:
+        settings.MAINTAINABILITY_INDEX_MIN = old_mi_min
