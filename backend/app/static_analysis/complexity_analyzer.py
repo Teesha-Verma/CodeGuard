@@ -15,7 +15,7 @@ class ComplexityAnalyzer:
     exceeded.
     """
 
-    def analyze(self, code: str) -> Dict[str, Any]:
+    def analyze(self, code: str, file_path: str = "") -> Dict[str, Any]:
         settings = get_settings()
         cc_max = settings.CYCLOMATIC_COMPLEXITY_MAX
         mi_min = settings.MAINTAINABILITY_INDEX_MIN
@@ -34,13 +34,12 @@ class ComplexityAnalyzer:
                     "end_line": getattr(func, "endline", func.lineno),
                     "exceeds_threshold": exceeds,
                 }
-                # Phase 5: human-readable interpretation when threshold breached
+                # Nuanced function complexity interpretation
                 if exceeds:
                     entry["interpretation"] = (
-                        f"This function has high cyclomatic complexity "
-                        f"(CC={func.complexity}, threshold={cc_max}), making it "
-                        f"difficult to cover with unit tests. Suggest dividing it "
-                        f"into smaller helpers."
+                        f"This function has a higher number of execution paths "
+                        f"(CC={func.complexity}, threshold={cc_max}). Simplifying the control "
+                        f"flow or refactoring into smaller helpers would improve legibility."
                     )
                 functions.append(entry)
 
@@ -57,13 +56,30 @@ class ComplexityAnalyzer:
                 "mi_exceeds_threshold": mi_exceeds,
             }
 
-            # Phase 5: human-readable MI interpretation when threshold breached (Phase 3 refinement)
+            # Human-readable MI interpretation when threshold breached
             if mi_exceeds:
-                result["mi_interpretation"] = (
-                    f"This code has increased structural density and lower "
-                    f"maintainability metrics (MI={mi_score:.1f}, threshold={mi_min}). "
-                    f"Suggest simplifying nested structures or decomposing logic."
+                from app.static_analysis.context_resolver import ContextResolver
+                context_meta = ContextResolver.resolve(file_path, code)
+                
+                is_declarative = (
+                    context_meta.get("is_declarative_file")
+                    or context_meta.get("is_config_file")
+                    or context_meta.get("is_test_file")
+                    or context_meta.get("is_migration_file")
+                    or context_meta.get("is_generated_file")
                 )
+                
+                if is_declarative:
+                    result["mi_interpretation"] = (
+                        f"This file contains structural abstractions or configurations (MI={mi_score:.1f}). "
+                        f"While the structural density is higher, this is typical for schemas, configurations, "
+                        f"or adapters. No critical refactoring is recommended."
+                    )
+                else:
+                    result["mi_interpretation"] = (
+                        f"The business logic in this file has higher structural complexity (MI={mi_score:.1f}, threshold={mi_min}). "
+                        f"Consider simplifying conditional branches or separating concern layers to keep it easily maintainable."
+                    )
 
             return result
 

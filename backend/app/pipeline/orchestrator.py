@@ -91,7 +91,7 @@ class PipelineOrchestrator:
             }
         })
         
-        comp = self.complexity.analyze(code_content)
+        comp = self.complexity.analyze(code_content, diff_file.file_path)
         scope_issues = self.scope.analyze(code_content)
         mutation_issues = self.mutation_detector.analyze(code_content)
         import_issues = self.import_analyzer.analyze(code_content)
