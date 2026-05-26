@@ -40,6 +40,8 @@ class MetricsCalculator:
             "suppressed_findings": suppressed_count,
             "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
             "by_source": {},
+            "detection_sources": {},
+            "reasoning_sources": {},
             "avg_confidence": 0.0,
             "evaluation_available": True
         }
@@ -57,7 +59,7 @@ class MetricsCalculator:
             else:
                 stats["by_severity"]["medium"] += 1
                 
-            # Map sources
+            # Map sources (legacy compatibility)
             srcs = issue.get("sources", [])
             if not srcs and "source" in issue:
                 old_src = issue["source"]
@@ -68,6 +70,23 @@ class MetricsCalculator:
             for src in srcs:
                 src_key = str(src).lower()
                 stats["by_source"][src_key] = stats["by_source"].get(src_key, 0) + 1
+                
+            # Map separated detection and reasoning sources
+            det_srcs = issue.get("detection_sources", [])
+            reas_src = str(issue.get("reasoning_source") or "static_analysis").lower()
+            
+            # Legacy fallback if detection_sources not explicitly populated in input dictionary
+            if not det_srcs:
+                det_srcs = [s for s in srcs if str(s).lower() != reas_src]
+                # If still empty (e.g. source was "llm" or "static_analysis" only), keep it
+                if not det_srcs and srcs:
+                    det_srcs = srcs
+            
+            for d_src in det_srcs:
+                d_key = str(d_src).lower()
+                stats["detection_sources"][d_key] = stats["detection_sources"].get(d_key, 0) + 1
+                
+            stats["reasoning_sources"][reas_src] = stats["reasoning_sources"].get(reas_src, 0) + 1
                 
             total_conf += float(issue.get("confidence", 0.0))
             

@@ -60,7 +60,9 @@ def run_snippet_review_task(review_id: str, code: str, language: str, filename: 
                 "severity": issue.severity,
                 "confidence": issue.confidence,
                 "sources": issue.sources,
-                "is_low_signal": issue.is_low_signal
+                "is_low_signal": issue.is_low_signal,
+                "detection_sources": issue.detection_sources,
+                "reasoning_source": issue.reasoning_source
             })
         summary_stats = MetricsCalculator.compute_summary_stats(raw_issues)
         
@@ -214,7 +216,9 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
                     "severity": issue.severity,
                     "confidence": issue.confidence,
                     "sources": issue.sources,
-                    "is_low_signal": issue.is_low_signal
+                    "is_low_signal": issue.is_low_signal,
+                    "detection_sources": issue.detection_sources,
+                    "reasoning_source": issue.reasoning_source
                 })
                 
         summary_stats = MetricsCalculator.compute_summary_stats(all_raw_issues)
