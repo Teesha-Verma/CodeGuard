@@ -129,10 +129,19 @@ class PipelineOrchestrator:
         # Collect traces from generator
         self.traces.extend(self.review_generator.traces)
         
+        # Count only validated, surfaced, and evidence-backed dangerous/safety-critical findings
+        dangerous_patterns_count = sum(
+            1 for issue in final_issues
+            if (
+                issue.issue_category in ("security", "mutation risks", "async misuse")
+                and issue.confidence >= 0.3
+            )
+        )
+        
         summary = {
             "function_count": len(ast_meta.get("functions", [])),
             "class_count": len(ast_meta.get("classes", [])),
-            "dangerous_patterns": len(import_issues.get("dangerous_imports", [])) + len(heuristic_issues)
+            "dangerous_patterns": dangerous_patterns_count
         }
 
         return FileReport(
