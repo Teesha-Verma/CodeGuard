@@ -428,7 +428,11 @@ class ReviewGenerator:
         if "E501" in rule or "C0301" in rule or "line too long" in msg.lower():
             limit_info = ""
             if ">" in msg:
-                limit_info = f" ({msg.split('>')[-1].strip()} characters)"
+                import re
+                after_gt = msg.split('>')[-1].strip()
+                match = re.search(r'\d+', after_gt)
+                if match:
+                    limit_info = f" (limit: {match.group(0)} characters)"
             root_cause = f"Line {line} stretches too far horizontally{limit_info}, which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult."
             trigger_condition = "This rule is triggered when a single line of code exceeds the recommended character limit."
             fix = "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation."

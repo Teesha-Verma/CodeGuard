@@ -7,9 +7,12 @@ def test_static_explanation_line_too_long():
     
     res = generator._generate_static_explanation(finding, "E501", "line too long (125 > 120)")
     assert "stretches too far horizontally" in res["root_cause"]
-    assert "Line 10 stretches too far horizontally" in res["root_cause"]
+    assert "Line 10 stretches too far horizontally (limit: 120 characters)" in res["root_cause"]
     assert "Consider breaking this line into multiple lines" in res["fix"]
     assert "This rule is triggered when a single line of code" in res["trigger_condition"]
+
+    res2 = generator._generate_static_explanation(finding, "E501", "line too long (125 > 120 characters)")
+    assert "Line 10 stretches too far horizontally (limit: 120 characters)" in res2["root_cause"]
 
 
 def test_static_explanation_whitespace():
