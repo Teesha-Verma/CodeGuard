@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 from typing import List, Optional, Dict, Any
 
 class ReviewRequest(BaseModel):
@@ -34,15 +34,9 @@ class ReviewIssue(BaseModel):
     detection_sources: List[str] = Field(default_factory=list, description="List of detection tools/sources")
     file_path: Optional[str] = Field(None, description="Path to the reviewed file containing this issue")
 
-    def model_dump(self, *args, **kwargs):
-        json_keys = {
-            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
-            "default", "encoding", "errors", "parse_float", "parse_int",
-            "parse_constant", "object_hook", "object_pairs_hook", "indent",
-            "separators", "sort_keys"
-        }
-        clean_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
-        data = super().model_dump(*args, **clean_kwargs)
+    @model_serializer(mode="wrap")
+    def serialize_model(self, handler) -> Dict[str, Any]:
+        data = handler(self)
         is_style_or_suppressed = self.is_low_signal or self.confidence < 0.3
         
         import os
@@ -70,6 +64,16 @@ class ReviewIssue(BaseModel):
             data["rule_id"] = self.issue_type
             data["message"] = self.issue
         return data
+
+    def model_dump(self, *args, **kwargs):
+        json_keys = {
+            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
+            "default", "encoding", "errors", "parse_float", "parse_int",
+            "parse_constant", "object_hook", "object_pairs_hook", "indent",
+            "separators", "sort_keys"
+        }
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
+        return super().model_dump(*args, **clean_kwargs)
 
     def model_dump_json(self, *args, **kwargs):
         import json
