@@ -73,7 +73,34 @@ class ReviewIssue(BaseModel):
             "separators", "sort_keys"
         }
         clean_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
-        return super().model_dump(*args, **clean_kwargs)
+        data = super().model_dump(*args, **clean_kwargs)
+        is_style_or_suppressed = self.is_low_signal or self.confidence < 0.3
+        
+        import os
+        from app.core.config import get_settings
+        settings = get_settings()
+        verbose_style_env = os.environ.get("VERBOSE_STYLE")
+        if verbose_style_env is not None:
+            verbose_style = verbose_style_env.lower() == "true"
+        else:
+            verbose_style = settings.DEBUG
+        
+        if is_style_or_suppressed and not verbose_style:
+            # Strip verbose fields for style-only and suppressed findings to optimize payload sizes (Phase 3)
+            verbose_fields = [
+                "root_cause", "trigger_condition", "fix", "patch", "evidence", 
+                "sources", "detection_sources", "reasoning_trace", 
+                "issue_category", "reasoning_source", "priority_score",
+                "is_low_signal"
+            ]
+            for field in verbose_fields:
+                if field in data:
+                    data.pop(field)
+            
+            # Map rule_id and message for style-finding specialization compatibility
+            data["rule_id"] = self.issue_type
+            data["message"] = self.issue
+        return data
 
     def model_dump_json(self, *args, **kwargs):
         import json

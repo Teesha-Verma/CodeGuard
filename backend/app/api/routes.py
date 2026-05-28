@@ -107,7 +107,8 @@ async def get_review_status(
         store = ReviewStore()
         report = store.get_report(review_id)
         if report:
-            return report
+            from fastapi.responses import JSONResponse
+            return JSONResponse(content=report.model_dump())
         else:
             raise HTTPException(status_code=404, detail="Review report file not found on disk.")
             
