@@ -35,7 +35,14 @@ class ReviewIssue(BaseModel):
     file_path: Optional[str] = Field(None, description="Path to the reviewed file containing this issue")
 
     def model_dump(self, *args, **kwargs):
-        data = super().model_dump(*args, **kwargs)
+        json_keys = {
+            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
+            "default", "encoding", "errors", "parse_float", "parse_int",
+            "parse_constant", "object_hook", "object_pairs_hook", "indent",
+            "separators", "sort_keys"
+        }
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
+        data = super().model_dump(*args, **clean_kwargs)
         is_style_or_suppressed = self.is_low_signal or self.confidence < 0.3
         
         import os
@@ -110,12 +117,19 @@ class FileReport(BaseModel):
             self.issues = self.meaningful_issues
 
     def model_dump(self, *args, **kwargs):
-        data = super().model_dump(*args, **kwargs)
+        json_keys = {
+            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
+            "default", "encoding", "errors", "parse_float", "parse_int",
+            "parse_constant", "object_hook", "object_pairs_hook", "indent",
+            "separators", "sort_keys"
+        }
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
+        data = super().model_dump(*args, **clean_kwargs)
         for field_name in ["issues", "meaningful_issues", "style_findings", "suppressed_findings"]:
             if field_name in data and isinstance(data[field_name], list):
                 original_list = getattr(self, field_name)
                 if original_list:
-                    data[field_name] = [issue.model_dump(*args, **kwargs) for issue in original_list]
+                    data[field_name] = [issue.model_dump(*args, **clean_kwargs) for issue in original_list]
         return data
 
     def model_dump_json(self, *args, **kwargs):
@@ -157,9 +171,16 @@ class ReviewReport(BaseModel):
                 self.evaluation_metrics = None
 
     def model_dump(self, *args, **kwargs):
-        data = super().model_dump(*args, **kwargs)
+        json_keys = {
+            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
+            "default", "encoding", "errors", "parse_float", "parse_int",
+            "parse_constant", "object_hook", "object_pairs_hook", "indent",
+            "separators", "sort_keys"
+        }
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
+        data = super().model_dump(*args, **clean_kwargs)
         if self.file_reports:
-            data["file_reports"] = [report.model_dump(*args, **kwargs) for report in self.file_reports]
+            data["file_reports"] = [report.model_dump(*args, **clean_kwargs) for report in self.file_reports]
         return data
 
     def model_dump_json(self, *args, **kwargs):

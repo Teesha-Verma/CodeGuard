@@ -394,10 +394,20 @@ def test_serialization_contract_bug():
         trace_id="trace-test"
     )
     
-    # This must NOT crash with TypeError: model_dump() got an unexpected keyword argument 'indent'
+    # 1. This must NOT crash with TypeError in model_dump_json()
     json_str = report.model_dump_json(indent=4)
     assert json_str is not None
     assert "rev-test" in json_str
+
+    # 2. This must NOT crash when calling model_dump directly with json kwargs (strict contract isolation)
+    dump_dict = report.model_dump(indent=4)
+    assert dump_dict is not None
+    assert dump_dict["review_id"] == "rev-test"
+
+    # 3. This must NOT crash when calling dict directly with json kwargs
+    dict_dict = report.dict(indent=4)
+    assert dict_dict is not None
+    assert dict_dict["review_id"] == "rev-test"
 
 
 def test_response_contract_regression_comprehensive():
