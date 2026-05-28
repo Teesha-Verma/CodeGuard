@@ -433,39 +433,39 @@ class ReviewGenerator:
                 match = re.search(r'\d+', after_gt)
                 if match:
                     limit_info = f" (limit: {match.group(0)} characters)"
-            root_cause = f"Line {line} stretches too far horizontally{limit_info}, which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult."
-            trigger_condition = "This rule is triggered when a single line of code exceeds the recommended character limit."
-            fix = "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation."
+            root_cause = f"This line on line {line} exceeds the configured limit{limit_info}, which can reduce code readability and make side-by-side diff reviews harder."
+            trigger_condition = "Occurs when a line exceeds the maximum recommended character limit."
+            fix = "Consider splitting this line into logical segments, extracting complex expressions into helper variables, or wrapping long method parameters."
             
         # 2. Whitespace / Indentation / Empty lines
         elif any(x in rule for x in ("E301", "E302", "E303", "E305", "E2", "W291", "W292", "W293", "W391", "C0303", "C0325", "C0326", "C0304", "C0305")):
-            root_cause = f"Line {line} contains minor spacing anomalies, such as extra whitespace, incorrect operator padding, or trailing spaces."
-            trigger_condition = "Triggered by whitespace characters that deviate from standard code formatting guidelines."
-            fix = "Remove the trailing whitespace or adjust spacing around operators and block boundaries to restore standard style compliance."
+            root_cause = f"Operator padding or trailing whitespace on line {line} deviates from clean coding conventions."
+            trigger_condition = "Flags trailing whitespace or inconsistent line spacing that violates formatting standards."
+            fix = "Trim the trailing whitespace or adjust spacing around operators to maintain standard codebase formatting."
             
         # 3. Missing docstrings
         elif any(x in rule for x in ("C0114", "C0115", "C0116")):
-            root_cause = f"The public interface, class, or function on line {line} is undocumented. Adding clear docstrings makes the API easier for others to understand and use."
-            trigger_condition = "This warning flags public declarations that are missing descriptive docstrings."
-            fix = "Add a concise docstring that explains the component's purpose, its input parameters, and its return values."
+            root_cause = f"The public component on line {line} lacks inline documentation. Clear docstrings make public APIs significantly easier to maintain."
+            trigger_condition = "Flags public modules, classes, or functions that do not declare a descriptive docstring."
+            fix = "Add a concise docstring summarizing the component's purpose, arguments, and return types."
  
         # 4. Radon Nesting / Heuristics
         elif "NESTING" in rule or "nesting" in msg.lower():
-            root_cause = f"Line {line} has deeply nested logical blocks. This increases cognitive complexity and makes following execution flows significantly harder."
-            trigger_condition = "This warning is raised when block nesting levels exceed the recommended complexity threshold."
-            fix = "Simplify the structure by returning early with guard clauses or refactoring the deeply nested sections into separate helper methods."
+            root_cause = f"The logic on line {line} has deep structural nesting, which increases cognitive load and hampers readability."
+            trigger_condition = "Triggered when nested block structures exceed standard nesting limits."
+            fix = "Refactor deep nesting by returning early with guard clauses or extracting inner logic blocks into separate helper methods."
             
         # 5. Shadowing (when suppressed / low confidence)
         elif "SHADOWING" in rule or "shadow" in msg.lower():
-            root_cause = f"A variable definition on line {line} overrides or shadows an existing identifier from a higher scope or built-in namespace."
-            trigger_condition = "Occurs when a local variable shares a name with a symbol in an outer scope, leading to potential namespace confusion."
-            fix = "Rename the local variable to a more specific name to avoid shadowing outer scopes and protect against unintended scope bugs."
+            root_cause = f"A variable definition on line {line} shadows a built-in function or an identifier in an outer scope."
+            trigger_condition = "Occurs when a local scope declaration overrides a symbol in a parent namespace."
+            fix = "Rename this identifier to avoid name collisions and protect against subtle runtime scoping issues."
             
         # 6. Global modification
         elif "GLOBAL" in rule or "global" in msg.lower():
-            root_cause = f"Line {line} modifies a global variable. Mutating global variables directly introduces hidden state modifications and hampers testability."
-            trigger_condition = "Triggered when the 'global' keyword is utilized to mutate state outside the local function context."
-            fix = "Re-architect the function to accept the global value as an argument and return the new value, keeping state mutations localized."
+            root_cause = f"Directly mutating a global variable on line {line} creates hidden side-effects and reduces modular testability."
+            trigger_condition = "Flags usage of the 'global' declaration inside functions to mutate external state."
+            fix = "Re-architect the function to accept the global variable as an input parameter and return the updated value."
             
         return {
             "root_cause": root_cause,
