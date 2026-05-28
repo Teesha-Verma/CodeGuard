@@ -12,7 +12,6 @@ class MetricsCalculator:
                 "style_findings": 0,
                 "suppressed_findings": 0,
                 "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
-                "avg_confidence": None,
                 "avg_meaningful_confidence": None,
                 "avg_style_confidence": None,
                 "evaluation_available": False
@@ -47,7 +46,6 @@ class MetricsCalculator:
             "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
             "detection_sources": {},
             "reasoning_sources": {},
-            "avg_confidence": 0.0,
             "avg_meaningful_confidence": None,
             "avg_style_confidence": None,
             "evaluation_available": True
@@ -95,8 +93,5 @@ class MetricsCalculator:
         
         stats["avg_meaningful_confidence"] = avg_meaningful
         stats["avg_style_confidence"] = avg_style
-        
-        # Set avg_confidence to avg_meaningful_confidence (or avg_style if no meaningful issues exist) to avoid linter style noise
-        stats["avg_confidence"] = avg_meaningful if avg_meaningful is not None else avg_style
         return stats
 

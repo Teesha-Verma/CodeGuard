@@ -65,14 +65,16 @@ def test_import_detection():
 def test_summary_stats_empty():
     stats = MetricsCalculator.compute_summary_stats([])
     assert stats["total_issues"] == 0
-    assert stats["avg_confidence"] is None
+    assert "avg_confidence" not in stats
+    assert stats["avg_meaningful_confidence"] is None
+    assert stats["avg_style_confidence"] is None
     assert stats["evaluation_available"] is False
 
 def test_summary_stats_with_issues():
     issues = [
-        {"severity": "high", "source": "llm", "confidence": 0.9},
-        {"severity": "medium", "source": "linter", "confidence": 0.7},
-        {"thought": "", "severity": "critical", "source": "llm", "confidence": 0.95},
+        {"severity": "high", "source": "llm", "confidence": 0.9, "is_low_signal": False},
+        {"severity": "medium", "source": "linter", "confidence": 0.7, "is_low_signal": False},
+        {"thought": "", "severity": "critical", "source": "llm", "confidence": 0.95, "is_low_signal": False},
     ]
     stats = MetricsCalculator.compute_summary_stats(issues)
     
@@ -82,5 +84,7 @@ def test_summary_stats_with_issues():
     assert stats["detection_sources"]["llm"] == 2
     assert stats["detection_sources"]["linter"] == 1
     assert stats["reasoning_sources"]["static_analysis"] == 3
-    assert stats["avg_confidence"] == round((0.9 + 0.7 + 0.95) / 3, 2)
+    assert "avg_confidence" not in stats
+    assert stats["avg_meaningful_confidence"] == round((0.9 + 0.7 + 0.95) / 3, 2)
+    assert stats["avg_style_confidence"] is None
     assert stats["evaluation_available"] is True

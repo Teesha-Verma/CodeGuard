@@ -81,7 +81,7 @@ def run_snippet_review_task(review_id: str, code: str, language: str, filename: 
         store.save_report(report)
         
         # Save individual issues to DB
-        for issue in file_report.issues:
+        for issue in file_report.meaningful_issues:
             issue_data = {
                 "line": issue.line,
                 "severity": issue.severity,
@@ -240,7 +240,7 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
         
         # Save individual issues to DB
         for file_report in file_reports:
-            for issue in file_report.issues:
+            for issue in file_report.meaningful_issues:
                 issue_data = {
                     "line": issue.line,
                     "severity": issue.severity,

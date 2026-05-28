@@ -87,8 +87,8 @@ def test_orchestrator_and_generator_trace_generation():
         assert "source_attributions" in conf_trace["output_data"]
         
         # Check newly populated ReviewIssue fields
-        assert len(report.issues) > 0
-        issue = report.issues[0]
+        assert len(report.meaningful_issues) > 0
+        issue = report.meaningful_issues[0]
         assert issue.signal_priority == "high"
         assert issue.issue_category == "mutation risks"
         assert issue.is_low_signal is False

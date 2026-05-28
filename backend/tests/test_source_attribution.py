@@ -32,7 +32,7 @@ def test_source_attribution_separated():
     
     assert stats["avg_meaningful_confidence"] == 0.88
     assert stats["avg_style_confidence"] is None
-    assert stats["avg_confidence"] == 0.88
+    assert "avg_confidence" not in stats
 
 
 def test_source_attribution_legacy_fallback():
@@ -79,4 +79,4 @@ def test_confidence_metrics_separated():
     
     assert stats["avg_meaningful_confidence"] == 0.90
     assert stats["avg_style_confidence"] == 0.55
-    assert stats["avg_confidence"] == 0.90
+    assert "avg_confidence" not in stats

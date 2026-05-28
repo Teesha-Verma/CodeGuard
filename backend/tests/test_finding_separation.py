@@ -54,9 +54,7 @@ def test_schema_auto_categorization():
         issues=[issue_meaningful, issue_style, issue_suppressed]
     )
     
-    assert len(file_report.issues) == 1
-    assert file_report.issues[0].issue == "Logic bug"
-    
+
     assert len(file_report.meaningful_issues) == 1
     assert file_report.meaningful_issues[0].issue == "Logic bug"
     

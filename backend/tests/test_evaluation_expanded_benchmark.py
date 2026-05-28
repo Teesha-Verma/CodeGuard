@@ -207,7 +207,6 @@ def test_style_only_pr_review():
     )
     
     # The issues list should ONLY contain meaningful safety-critical issues, so it must be empty
-    assert len(file_report.issues) == 0
     assert len(file_report.meaningful_issues) == 0
     assert len(file_report.style_findings) == 1
     assert file_report.style_findings[0].issue == "line too long"
@@ -230,8 +229,7 @@ def test_empty_meaningful_output():
     assert stats["suppressed_findings"] == 1
     assert stats["avg_meaningful_confidence"] is None
     assert stats["avg_style_confidence"] == 0.50
-    # avg_confidence falls back to average style confidence when no meaningful issues exist
-    assert stats["avg_confidence"] == 0.50
+    assert "avg_confidence" not in stats
 
 
 def test_abstraction_heavy_file_maintainability():
@@ -357,7 +355,7 @@ def test_duplication_prevention_report():
     
     # Assert that full details STILL exist at the file level report
     assert len(dumped["file_reports"]) == 1
-    detailed_file_issue = dumped["file_reports"][0]["issues"][0]
+    detailed_file_issue = dumped["file_reports"][0]["meaningful_issues"][0]
     assert "root_cause" in detailed_file_issue
     assert detailed_file_issue["root_cause"] == "Detail root cause"
     assert "reasoning_trace" in detailed_file_issue
@@ -461,7 +459,7 @@ def test_response_contract_regression_comprehensive():
             "meaningful_issues": 1,
             "style_findings": 1,
             "suppressed_findings": 0,
-            "avg_confidence": 0.9,
+            "avg_meaningful_confidence": 0.9,
             "evaluation_available": True
         },
         trace_id="trace-regression"
@@ -479,12 +477,12 @@ def test_response_contract_regression_comprehensive():
     # findings MUST be owned ONLY by file_reports
     assert len(dumped["file_reports"]) == 1
     file_rep_dump = dumped["file_reports"][0]
-    assert len(file_rep_dump["issues"]) == 1  # issues field ONLY contains meaningful issues
+    assert "issues" not in file_rep_dump  # issues field is removed entirely (Task 1)
     assert len(file_rep_dump["meaningful_issues"]) == 1
     assert len(file_rep_dump["style_findings"]) == 1
     
     # Verbose details MUST still exist for safety-critical meaningful findings
-    meaningful_dump = file_rep_dump["issues"][0]
+    meaningful_dump = file_rep_dump["meaningful_issues"][0]
     assert meaningful_dump["root_cause"] == "Unsanitized user input concatenation in query"
     assert "reasoning_trace" in meaningful_dump
     

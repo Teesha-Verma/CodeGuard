@@ -59,8 +59,7 @@ class ReviewIssue(BaseModel):
             verbose_fields = [
                 "root_cause", "trigger_condition", "fix", "patch", "evidence", 
                 "sources", "detection_sources", "reasoning_trace", 
-                "signal_priority", "issue_category", "detection_source", 
-                "reasoning_source", "priority_score"
+                "issue_category", "reasoning_source", "priority_score"
             ]
             for field in verbose_fields:
                 if field in data:
@@ -88,7 +87,6 @@ class ReviewIssue(BaseModel):
 
 class FileReport(BaseModel):
     file_path: str = Field(..., description="Path to the reviewed file")
-    issues: List[ReviewIssue] = Field(default_factory=list, description="List of all detected issues in this file")
     meaningful_issues: List[ReviewIssue] = Field(default_factory=list, description="List of high-confidence, safety-critical issues")
     style_findings: List[ReviewIssue] = Field(default_factory=list, description="List of low-signal or style-only findings")
     suppressed_findings: List[ReviewIssue] = Field(default_factory=list, description="List of contextually suppressed or extremely low confidence findings")
@@ -97,14 +95,14 @@ class FileReport(BaseModel):
     linter_findings: Optional[List[Dict[str, Any]]] = Field(None, description="Raw linter findings for this file")
 
     def __init__(self, **data):
+        issues_helper = data.pop("issues", [])
         super().__init__(**data)
-        # Automatically split findings if issues is populated but sub-lists are empty
-        if self.issues and not (self.meaningful_issues or self.style_findings or self.suppressed_findings):
-            raw_issues = self.issues
+        # Automatically split findings if issues_helper is populated but sub-lists are empty
+        if issues_helper and not (self.meaningful_issues or self.style_findings or self.suppressed_findings):
             self.meaningful_issues = []
             self.style_findings = []
             self.suppressed_findings = []
-            for issue in raw_issues:
+            for issue in issues_helper:
                 if self.file_path:
                     issue.file_path = self.file_path
                 if issue.confidence < 0.3:
@@ -113,8 +111,6 @@ class FileReport(BaseModel):
                     self.style_findings.append(issue)
                 else:
                     self.meaningful_issues.append(issue)
-            # Enforce strict V1 behavior: issues field ONLY contains meaningful safety-critical findings
-            self.issues = self.meaningful_issues
 
     def model_dump(self, *args, **kwargs):
         json_keys = {
@@ -125,7 +121,7 @@ class FileReport(BaseModel):
         }
         clean_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
         data = super().model_dump(*args, **clean_kwargs)
-        for field_name in ["issues", "meaningful_issues", "style_findings", "suppressed_findings"]:
+        for field_name in ["meaningful_issues", "style_findings", "suppressed_findings"]:
             if field_name in data and isinstance(data[field_name], list):
                 original_list = getattr(self, field_name)
                 if original_list:
