@@ -349,15 +349,10 @@ def test_duplication_prevention_report():
     
     dumped = report.model_dump()
     
-    # Assert top-level meaningful_issues are lightweight references
-    assert len(dumped["meaningful_issues"]) == 1
-    ref = dumped["meaningful_issues"][0]
-    
-    # Check that it ONLY contains essential reference keys
-    expected_keys = {"file_path", "line", "severity", "confidence", "issue", "issue_type", "is_low_signal"}
-    assert set(ref.keys()) == expected_keys
-    assert ref["file_path"] == "app/core.py"
-    assert ref["line"] == 10
+    # Assert top-level lists are completely removed
+    assert "meaningful_issues" not in dumped
+    assert "style_findings" not in dumped
+    assert "suppressed_findings" not in dumped
     
     # Assert that full details STILL exist at the file level report
     assert len(dumped["file_reports"]) == 1
@@ -386,4 +381,21 @@ def test_consistency_validation_report():
         trace_id="trace-eval"
     )
     assert report_eval_false.evaluation_metrics is None
+
+
+def test_serialization_contract_bug():
+    from app.api.schemas import ReviewReport
+    
+    report = ReviewReport(
+        review_id="rev-test",
+        file_reports=[],
+        summary_stats={"evaluation_available": False},
+        trace_id="trace-test"
+    )
+    
+    # This must NOT crash with TypeError: model_dump() got an unexpected keyword argument 'indent'
+    json_str = report.model_dump_json(indent=4)
+    assert json_str is not None
+    assert "rev-test" in json_str
+
 

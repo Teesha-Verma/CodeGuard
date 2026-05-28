@@ -68,7 +68,15 @@ class ReviewIssue(BaseModel):
 
     def model_dump_json(self, *args, **kwargs):
         import json
-        return json.dumps(self.model_dump(*args, **kwargs))
+        json_keys = {
+            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
+            "default", "encoding", "errors", "parse_float", "parse_int",
+            "parse_constant", "object_hook", "object_pairs_hook", "indent",
+            "separators", "sort_keys"
+        }
+        json_kwargs = {k: v for k, v in kwargs.items() if k in json_keys}
+        dump_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
+        return json.dumps(self.model_dump(*args, **dump_kwargs), **json_kwargs)
 
     def dict(self, *args, **kwargs):
         return self.model_dump(*args, **kwargs)
@@ -106,32 +114,14 @@ class FileReport(BaseModel):
 class ReviewReport(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")
     file_reports: List[FileReport] = Field(default_factory=list, description="List of file reports")
-    meaningful_issues: List[ReviewIssue] = Field(default_factory=list, description="Aggregated high-confidence, safety-critical issues across files")
-    style_findings: List[ReviewIssue] = Field(default_factory=list, description="Aggregated low-signal or style-only findings across files")
-    suppressed_findings: List[ReviewIssue] = Field(default_factory=list, description="Aggregated contextually suppressed findings across files")
     summary_stats: Dict[str, Any] = Field(default_factory=dict, description="Aggregated statistics of the review")
     evaluation_metrics: Optional[Dict[str, Any]] = Field(None, description="Evaluation metrics (if ground truth is available or for benchmark comparisons)")
     trace_id: str = Field(..., description="Trace identifier for logs")
 
     def __init__(self, **data):
         super().__init__(**data)
-        # Automatically aggregate across all file reports and set file_path
-        if self.file_reports and not (self.meaningful_issues or self.style_findings or self.suppressed_findings):
-            self.meaningful_issues = []
-            self.style_findings = []
-            self.suppressed_findings = []
-            for report in self.file_reports:
-                for issue in report.meaningful_issues:
-                    issue.file_path = report.file_path
-                    self.meaningful_issues.append(issue)
-                for issue in report.style_findings:
-                    issue.file_path = report.file_path
-                    self.style_findings.append(issue)
-                for issue in report.suppressed_findings:
-                    issue.file_path = report.file_path
-                    self.suppressed_findings.append(issue)
         
-        # Standardize evaluation_available consistency (Phase 4)
+        # Standardize evaluation_available consistency (Phase 5)
         if self.summary_stats:
             if self.summary_stats.get("evaluation_available"):
                 if self.evaluation_metrics is None:
@@ -145,38 +135,19 @@ class ReviewReport(BaseModel):
                 self.evaluation_metrics = None
 
     def model_dump(self, *args, **kwargs):
-        data = super().model_dump(*args, **kwargs)
-        
-        # Strip detailed fields from top-level aggregated lists to avoid payload duplication (Phase 2 - Option A)
-        for list_name in ["meaningful_issues", "style_findings", "suppressed_findings"]:
-            if list_name in data and isinstance(data[list_name], list):
-                referenced_list = []
-                for issue_dict in data[list_name]:
-                    ref = {
-                        "file_path": issue_dict.get("file_path"),
-                        "line": issue_dict.get("line"),
-                        "severity": issue_dict.get("severity"),
-                        "confidence": issue_dict.get("confidence"),
-                        "issue_type": issue_dict.get("issue_type"),
-                        "is_low_signal": issue_dict.get("is_low_signal")
-                    }
-                    
-                    if "rule_id" in issue_dict:
-                        ref["rule_id"] = issue_dict["rule_id"]
-                    if "message" in issue_dict:
-                        ref["message"] = issue_dict["message"]
-                    if "issue" in issue_dict:
-                        ref["issue"] = issue_dict["issue"]
-                    elif "message" in issue_dict and "issue" not in ref:
-                        ref["issue"] = issue_dict["message"]
-                        
-                    referenced_list.append(ref)
-                data[list_name] = referenced_list
-        return data
+        return super().model_dump(*args, **kwargs)
 
     def model_dump_json(self, *args, **kwargs):
         import json
-        return json.dumps(self.model_dump(*args, **kwargs))
+        json_keys = {
+            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
+            "default", "encoding", "errors", "parse_float", "parse_int",
+            "parse_constant", "object_hook", "object_pairs_hook", "indent",
+            "separators", "sort_keys"
+        }
+        json_kwargs = {k: v for k, v in kwargs.items() if k in json_keys}
+        dump_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
+        return json.dumps(self.model_dump(*args, **dump_kwargs), **json_kwargs)
 
     def dict(self, *args, **kwargs):
         return self.model_dump(*args, **kwargs)

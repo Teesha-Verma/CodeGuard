@@ -66,13 +66,13 @@ def test_schema_auto_categorization():
     assert len(file_report.suppressed_findings) == 1
     assert file_report.suppressed_findings[0].issue == "Assert in test"
     
-    # Test ReviewReport auto-aggregation
+    # Test ReviewReport
     review_report = ReviewReport(
         review_id="rev-123",
         file_reports=[file_report],
         trace_id="rev-123"
     )
     
-    assert len(review_report.meaningful_issues) == 1
-    assert len(review_report.style_findings) == 1
-    assert len(review_report.suppressed_findings) == 1
+    assert len(review_report.file_reports[0].meaningful_issues) == 1
+    assert len(review_report.file_reports[0].style_findings) == 1
+    assert len(review_report.file_reports[0].suppressed_findings) == 1
