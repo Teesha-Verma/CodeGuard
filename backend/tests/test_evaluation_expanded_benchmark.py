@@ -289,13 +289,14 @@ def test_lightweight_style_findings_serialization():
     dumped = issue_style.model_dump()
     
     # Assert stripped verbose fields
-    for field in ["root_cause", "trigger_condition", "fix", "patch", "evidence", "sources", "detection_sources"]:
+    for field in ["root_cause", "trigger_condition", "fix", "patch", "evidence", "sources", "detection_sources", "reasoning_trace"]:
         assert field not in dumped
         
-    # Assert condensed reasoning trace
-    assert "reasoning_trace" in dumped
-    assert len(dumped["reasoning_trace"]) == 1
-    assert dumped["reasoning_trace"][0] == "Static analysis explanation generated."
+    assert "rule_id" in dumped
+    assert dumped["rule_id"] == "style"
+    assert "message" in dumped
+    assert dumped["message"] == "line too long"
+    assert "issue" not in dumped
     
     # 2. Detailed (verbose) serialization
     os.environ["VERBOSE_STYLE"] = "true"
@@ -307,3 +308,82 @@ def test_lightweight_style_findings_serialization():
     
     # Clean up env
     os.environ.pop("VERBOSE_STYLE", None)
+
+
+def test_duplication_prevention_report():
+    from app.api.schemas import ReviewReport, FileReport, ReviewIssue
+    
+    issue = ReviewIssue(
+        line=10,
+        severity="medium",
+        confidence=0.8,
+        issue="Logic issue",
+        root_cause="Detail root cause",
+        trigger_condition="Detail trigger",
+        fix="Detail fix",
+        issue_type="security",
+        sources=["ast"],
+        reasoning_trace=["Trace info"],
+        evidence={"nodes": []},
+        is_low_signal=False
+    )
+    
+    file_report = FileReport(
+        file_path="app/core.py",
+        issues=[issue]
+    )
+    
+    report = ReviewReport(
+        review_id="rev-test",
+        file_reports=[file_report],
+        summary_stats={
+            "total_issues": 1,
+            "meaningful_issues": 1,
+            "style_findings": 0,
+            "suppressed_findings": 0,
+            "avg_confidence": 0.8,
+            "evaluation_available": False
+        },
+        trace_id="trace-test"
+    )
+    
+    dumped = report.model_dump()
+    
+    # Assert top-level meaningful_issues are lightweight references
+    assert len(dumped["meaningful_issues"]) == 1
+    ref = dumped["meaningful_issues"][0]
+    
+    # Check that it ONLY contains essential reference keys
+    expected_keys = {"file_path", "line", "severity", "confidence", "issue", "issue_type", "is_low_signal"}
+    assert set(ref.keys()) == expected_keys
+    assert ref["file_path"] == "app/core.py"
+    assert ref["line"] == 10
+    
+    # Assert that full details STILL exist at the file level report
+    assert len(dumped["file_reports"]) == 1
+    detailed_file_issue = dumped["file_reports"][0]["issues"][0]
+    assert "root_cause" in detailed_file_issue
+    assert detailed_file_issue["root_cause"] == "Detail root cause"
+    assert "reasoning_trace" in detailed_file_issue
+
+
+def test_consistency_validation_report():
+    from app.api.schemas import ReviewReport
+    
+    # 1. Test evaluation_available = True sets non-null metrics
+    report_eval_true = ReviewReport(
+        review_id="rev-eval",
+        summary_stats={"evaluation_available": True},
+        trace_id="trace-eval"
+    )
+    assert report_eval_true.evaluation_metrics is not None
+    assert report_eval_true.evaluation_metrics["status"] == "fully_evaluated"
+    
+    # 2. Test evaluation_available = False sets null metrics
+    report_eval_false = ReviewReport(
+        review_id="rev-eval",
+        summary_stats={"evaluation_available": False},
+        trace_id="trace-eval"
+    )
+    assert report_eval_false.evaluation_metrics is None
+

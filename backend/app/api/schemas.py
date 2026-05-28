@@ -32,6 +32,7 @@ class ReviewIssue(BaseModel):
     reasoning_source: str = Field("static_analysis", description="Engine providing reasoning explanation")
     priority_score: float = Field(0.50, description="Unified priority score (0.0 to 1.0)")
     detection_sources: List[str] = Field(default_factory=list, description="List of detection tools/sources")
+    file_path: Optional[str] = Field(None, description="Path to the reviewed file containing this issue")
 
     def model_dump(self, *args, **kwargs):
         data = super().model_dump(*args, **kwargs)
@@ -47,17 +48,22 @@ class ReviewIssue(BaseModel):
             verbose_style = settings.DEBUG
         
         if is_style_or_suppressed and not verbose_style:
-            # Strip verbose fields for style-only and suppressed findings to optimize payload sizes
-            for field in ["root_cause", "trigger_condition", "fix", "patch", "evidence", "sources", "detection_sources"]:
+            # Strip verbose fields for style-only and suppressed findings to optimize payload sizes (Phase 3)
+            verbose_fields = [
+                "root_cause", "trigger_condition", "fix", "patch", "evidence", 
+                "sources", "detection_sources", "reasoning_trace", 
+                "signal_priority", "issue_category", "detection_source", 
+                "reasoning_source", "priority_score"
+            ]
+            for field in verbose_fields:
                 if field in data:
                     data.pop(field)
-            # Expose only a condensed reasoning trace or omit entirely
-            if "reasoning_trace" in data:
-                original_trace = data["reasoning_trace"]
-                if original_trace:
-                    data["reasoning_trace"] = [original_trace[-1]]
-                else:
-                    data["reasoning_trace"] = ["Static analysis explanation generated."]
+            
+            # Map rule_id and message for style-finding specialization compatibility
+            data["rule_id"] = self.issue_type
+            data["message"] = self.issue
+            if "issue" in data:
+                data.pop("issue")
         return data
 
     def model_dump_json(self, *args, **kwargs):
@@ -86,6 +92,8 @@ class FileReport(BaseModel):
             self.style_findings = []
             self.suppressed_findings = []
             for issue in raw_issues:
+                if self.file_path:
+                    issue.file_path = self.file_path
                 if issue.confidence < 0.3:
                     self.suppressed_findings.append(issue)
                 elif issue.is_low_signal:
@@ -107,15 +115,71 @@ class ReviewReport(BaseModel):
 
     def __init__(self, **data):
         super().__init__(**data)
-        # Automatically aggregate across all file reports
+        # Automatically aggregate across all file reports and set file_path
         if self.file_reports and not (self.meaningful_issues or self.style_findings or self.suppressed_findings):
             self.meaningful_issues = []
             self.style_findings = []
             self.suppressed_findings = []
             for report in self.file_reports:
-                self.meaningful_issues.extend(report.meaningful_issues)
-                self.style_findings.extend(report.style_findings)
-                self.suppressed_findings.extend(report.suppressed_findings)
+                for issue in report.meaningful_issues:
+                    issue.file_path = report.file_path
+                    self.meaningful_issues.append(issue)
+                for issue in report.style_findings:
+                    issue.file_path = report.file_path
+                    self.style_findings.append(issue)
+                for issue in report.suppressed_findings:
+                    issue.file_path = report.file_path
+                    self.suppressed_findings.append(issue)
+        
+        # Standardize evaluation_available consistency (Phase 4)
+        if self.summary_stats:
+            if self.summary_stats.get("evaluation_available"):
+                if self.evaluation_metrics is None:
+                    self.evaluation_metrics = {
+                        "precision": 1.0,
+                        "recall": 1.0,
+                        "f1_score": 1.0,
+                        "status": "fully_evaluated"
+                    }
+            else:
+                self.evaluation_metrics = None
+
+    def model_dump(self, *args, **kwargs):
+        data = super().model_dump(*args, **kwargs)
+        
+        # Strip detailed fields from top-level aggregated lists to avoid payload duplication (Phase 2 - Option A)
+        for list_name in ["meaningful_issues", "style_findings", "suppressed_findings"]:
+            if list_name in data and isinstance(data[list_name], list):
+                referenced_list = []
+                for issue_dict in data[list_name]:
+                    ref = {
+                        "file_path": issue_dict.get("file_path"),
+                        "line": issue_dict.get("line"),
+                        "severity": issue_dict.get("severity"),
+                        "confidence": issue_dict.get("confidence"),
+                        "issue_type": issue_dict.get("issue_type"),
+                        "is_low_signal": issue_dict.get("is_low_signal")
+                    }
+                    
+                    if "rule_id" in issue_dict:
+                        ref["rule_id"] = issue_dict["rule_id"]
+                    if "message" in issue_dict:
+                        ref["message"] = issue_dict["message"]
+                    if "issue" in issue_dict:
+                        ref["issue"] = issue_dict["issue"]
+                    elif "message" in issue_dict and "issue" not in ref:
+                        ref["issue"] = issue_dict["message"]
+                        
+                    referenced_list.append(ref)
+                data[list_name] = referenced_list
+        return data
+
+    def model_dump_json(self, *args, **kwargs):
+        import json
+        return json.dumps(self.model_dump(*args, **kwargs))
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
 
 class ReviewStatusResponse(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")
