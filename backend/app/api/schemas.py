@@ -33,6 +33,40 @@ class ReviewIssue(BaseModel):
     priority_score: float = Field(0.50, description="Unified priority score (0.0 to 1.0)")
     detection_sources: List[str] = Field(default_factory=list, description="List of detection tools/sources")
 
+    def model_dump(self, *args, **kwargs):
+        data = super().model_dump(*args, **kwargs)
+        is_style_or_suppressed = self.is_low_signal or self.confidence < 0.3
+        
+        import os
+        from app.core.config import get_settings
+        settings = get_settings()
+        verbose_style_env = os.environ.get("VERBOSE_STYLE")
+        if verbose_style_env is not None:
+            verbose_style = verbose_style_env.lower() == "true"
+        else:
+            verbose_style = settings.DEBUG
+        
+        if is_style_or_suppressed and not verbose_style:
+            # Strip verbose fields for style-only and suppressed findings to optimize payload sizes
+            for field in ["root_cause", "trigger_condition", "fix", "patch", "evidence", "sources", "detection_sources"]:
+                if field in data:
+                    data.pop(field)
+            # Expose only a condensed reasoning trace or omit entirely
+            if "reasoning_trace" in data:
+                original_trace = data["reasoning_trace"]
+                if original_trace:
+                    data["reasoning_trace"] = [original_trace[-1]]
+                else:
+                    data["reasoning_trace"] = ["Static analysis explanation generated."]
+        return data
+
+    def model_dump_json(self, *args, **kwargs):
+        import json
+        return json.dumps(self.model_dump(*args, **kwargs))
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
 class FileReport(BaseModel):
     file_path: str = Field(..., description="Path to the reviewed file")
     issues: List[ReviewIssue] = Field(default_factory=list, description="List of all detected issues in this file")

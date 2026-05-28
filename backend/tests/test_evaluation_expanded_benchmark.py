@@ -258,3 +258,52 @@ class PaymentAdapter(TypedDict):
         assert res["mi_interpretation"] == "This file contains a large number of framework abstractions and helper methods, which lowers maintainability metrics."
     finally:
         settings.MAINTAINABILITY_INDEX_MIN = old_mi_min
+
+
+def test_lightweight_style_findings_serialization():
+    # Verify that style findings are serialized into lightweight/compact objects by default
+    from app.api.schemas import ReviewIssue
+    import os
+    
+    issue_style = ReviewIssue(
+        line=10,
+        severity="low",
+        confidence=0.8,
+        issue="line too long",
+        root_cause="Style warning",
+        trigger_condition="Exceeds limit",
+        fix="Wrap line",
+        issue_type="style",
+        sources=["flake8"],
+        reasoning_trace=["Evidence calculated", "Static analysis explanation generated."],
+        evidence={"ast_nodes": [], "linter_rules": []},
+        is_low_signal=True,
+        detection_source="flake8",
+        reasoning_source="static_analysis",
+        priority_score=0.2,
+        detection_sources=["flake8"]
+    )
+    
+    # 1. Default (lightweight) serialization
+    os.environ["VERBOSE_STYLE"] = "false"
+    dumped = issue_style.model_dump()
+    
+    # Assert stripped verbose fields
+    for field in ["root_cause", "trigger_condition", "fix", "patch", "evidence", "sources", "detection_sources"]:
+        assert field not in dumped
+        
+    # Assert condensed reasoning trace
+    assert "reasoning_trace" in dumped
+    assert len(dumped["reasoning_trace"]) == 1
+    assert dumped["reasoning_trace"][0] == "Static analysis explanation generated."
+    
+    # 2. Detailed (verbose) serialization
+    os.environ["VERBOSE_STYLE"] = "true"
+    dumped_verbose = issue_style.model_dump()
+    
+    for field in ["root_cause", "trigger_condition", "fix", "evidence", "sources", "detection_sources", "reasoning_trace"]:
+        assert field in dumped_verbose
+    assert len(dumped_verbose["reasoning_trace"]) == 2
+    
+    # Clean up env
+    os.environ.pop("VERBOSE_STYLE", None)
