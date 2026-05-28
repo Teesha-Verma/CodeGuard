@@ -489,8 +489,12 @@ def test_response_contract_regression_comprehensive():
     # 2. Verify stable style serialization (Correction 1)
     style_dump = file_rep_dump["style_findings"][0]
     
-    # Heavy fields MUST be removed
-    for heavy_field in ["root_cause", "trigger_condition", "fix", "patch", "evidence", "sources", "detection_sources", "reasoning_trace"]:
+    # Heavy fields MUST be removed to optimize payload size
+    for heavy_field in [
+        "root_cause", "trigger_condition", "fix", "patch", "evidence", 
+        "sources", "detection_sources", "reasoning_trace", "is_low_signal",
+        "priority_score", "reasoning_source", "issue_category"
+    ]:
         assert heavy_field not in style_dump
         
     # Crucial human-readable issue description and specialized message/rule_id fields MUST be kept

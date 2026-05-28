@@ -17,9 +17,9 @@ class ReviewIssue(BaseModel):
     severity: str = Field(..., description="Severity of the issue")
     confidence: float = Field(..., description="Confidence score (0.0 to 1.0)")
     issue: str = Field(..., description="Short description of the issue")
-    root_cause: str = Field(..., description="Detailed explanation of the root cause")
-    trigger_condition: str = Field(..., description="Condition under which this issue triggers")
-    fix: str = Field(..., description="Suggested fix or action")
+    root_cause: Optional[str] = Field(None, description="Detailed explanation of the root cause")
+    trigger_condition: Optional[str] = Field(None, description="Condition under which this issue triggers")
+    fix: Optional[str] = Field(None, description="Suggested fix or action")
     patch: Optional[str] = Field(None, description="Suggested code patch")
     issue_type: str = Field(..., description="Category of the issue")
     sources: List[str] = Field(default_factory=list, description="Source tools identifying findings")
@@ -59,7 +59,8 @@ class ReviewIssue(BaseModel):
             verbose_fields = [
                 "root_cause", "trigger_condition", "fix", "patch", "evidence", 
                 "sources", "detection_sources", "reasoning_trace", 
-                "issue_category", "reasoning_source", "priority_score"
+                "issue_category", "reasoning_source", "priority_score",
+                "is_low_signal"
             ]
             for field in verbose_fields:
                 if field in data:
