@@ -296,7 +296,8 @@ def test_lightweight_style_findings_serialization():
     assert dumped["rule_id"] == "style"
     assert "message" in dumped
     assert dumped["message"] == "line too long"
-    assert "issue" not in dumped
+    assert "issue" in dumped
+    assert dumped["issue"] == "line too long"
     
     # 2. Detailed (verbose) serialization
     os.environ["VERBOSE_STYLE"] = "true"
@@ -397,5 +398,121 @@ def test_serialization_contract_bug():
     json_str = report.model_dump_json(indent=4)
     assert json_str is not None
     assert "rev-test" in json_str
+
+
+def test_response_contract_regression_comprehensive():
+    from app.api.schemas import ReviewReport, FileReport, ReviewIssue
+    import os
+    
+    # Create canonical safety critical issue
+    issue_meaningful = ReviewIssue(
+        line=20,
+        severity="high",
+        confidence=0.9,
+        issue="SQL injection vulnerability",
+        root_cause="Unsanitized user input concatenation in query",
+        trigger_condition="User input contains single quotes",
+        fix="Use parameterized queries",
+        issue_type="security",
+        sources=["ast"],
+        reasoning_trace=["Analyzed query AST", "Flagged string interpolation"],
+        evidence={"query_node": "interpolated"},
+        is_low_signal=False
+    )
+    
+    # Create canonical style issue
+    issue_style = ReviewIssue(
+        line=30,
+        severity="low",
+        confidence=0.75,
+        issue="Line exceeds limit",
+        root_cause="Formatting violation",
+        trigger_condition="Length > 120",
+        fix="Wrap line",
+        issue_type="style",
+        sources=["flake8"],
+        reasoning_trace=["Parsed flake8 output"],
+        evidence={},
+        is_low_signal=True
+    )
+    
+    file_report = FileReport(
+        file_path="app/db.py",
+        issues=[issue_meaningful, issue_style],
+        verbose_ast=False,
+        ast_metadata=None
+    )
+    
+    report = ReviewReport(
+        review_id="rev-regression",
+        file_reports=[file_report],
+        summary_stats={
+            "total_issues": 1,
+            "meaningful_issues": 1,
+            "style_findings": 1,
+            "suppressed_findings": 0,
+            "avg_confidence": 0.9,
+            "evaluation_available": True
+        },
+        trace_id="trace-regression"
+    )
+    
+    # 1. Verify schema contract payload structures and ensure no top-level duplication
+    os.environ["VERBOSE_STYLE"] = "false"
+    dumped = report.model_dump()
+    
+    # Aggregated issue arrays MUST be completely removed from top level (Correction 2 & 3)
+    assert "meaningful_issues" not in dumped
+    assert "style_findings" not in dumped
+    assert "suppressed_findings" not in dumped
+    
+    # findings MUST be owned ONLY by file_reports
+    assert len(dumped["file_reports"]) == 1
+    file_rep_dump = dumped["file_reports"][0]
+    assert len(file_rep_dump["issues"]) == 1  # issues field ONLY contains meaningful issues
+    assert len(file_rep_dump["meaningful_issues"]) == 1
+    assert len(file_rep_dump["style_findings"]) == 1
+    
+    # Verbose details MUST still exist for safety-critical meaningful findings
+    meaningful_dump = file_rep_dump["issues"][0]
+    assert meaningful_dump["root_cause"] == "Unsanitized user input concatenation in query"
+    assert "reasoning_trace" in meaningful_dump
+    
+    # 2. Verify stable style serialization (Correction 1)
+    style_dump = file_rep_dump["style_findings"][0]
+    
+    # Heavy fields MUST be removed
+    for heavy_field in ["root_cause", "trigger_condition", "fix", "patch", "evidence", "sources", "detection_sources", "reasoning_trace"]:
+        assert heavy_field not in style_dump
+        
+    # Crucial human-readable issue description and specialized message/rule_id fields MUST be kept
+    assert style_dump["issue"] == "Line exceeds limit"
+    assert style_dump["message"] == "Line exceeds limit"
+    assert style_dump["rule_id"] == "style"
+    assert style_dump["line"] == 30
+    assert style_dump["severity"] == "low"
+    assert style_dump["confidence"] == 0.75
+    
+    # 3. Verify stable evaluation semantics (Correction 3)
+    # IF evaluation DID execute (evaluation_available=True): evaluation_metrics MUST be non-null
+    assert dumped["evaluation_metrics"] is not None
+    assert dumped["evaluation_metrics"]["precision"] == 1.0
+    
+    # IF evaluation did NOT execute: evaluation_metrics MUST be strictly null
+    report_no_eval = ReviewReport(
+        review_id="rev-regression",
+        file_reports=[file_report],
+        summary_stats={"evaluation_available": False},
+        trace_id="trace-regression"
+    )
+    dumped_no_eval = report_no_eval.model_dump()
+    assert dumped_no_eval["evaluation_metrics"] is None
+    
+    # 4. Verify stable verbose_ast behavior
+    assert file_rep_dump["ast_metadata"] is None
+    
+    # Clean up env
+    os.environ.pop("VERBOSE_STYLE", None)
+
 
 

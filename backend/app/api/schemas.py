@@ -62,8 +62,6 @@ class ReviewIssue(BaseModel):
             # Map rule_id and message for style-finding specialization compatibility
             data["rule_id"] = self.issue_type
             data["message"] = self.issue
-            if "issue" in data:
-                data.pop("issue")
         return data
 
     def model_dump_json(self, *args, **kwargs):
@@ -111,6 +109,30 @@ class FileReport(BaseModel):
             # Enforce strict V1 behavior: issues field ONLY contains meaningful safety-critical findings
             self.issues = self.meaningful_issues
 
+    def model_dump(self, *args, **kwargs):
+        data = super().model_dump(*args, **kwargs)
+        for field_name in ["issues", "meaningful_issues", "style_findings", "suppressed_findings"]:
+            if field_name in data and isinstance(data[field_name], list):
+                original_list = getattr(self, field_name)
+                if original_list:
+                    data[field_name] = [issue.model_dump(*args, **kwargs) for issue in original_list]
+        return data
+
+    def model_dump_json(self, *args, **kwargs):
+        import json
+        json_keys = {
+            "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",
+            "default", "encoding", "errors", "parse_float", "parse_int",
+            "parse_constant", "object_hook", "object_pairs_hook", "indent",
+            "separators", "sort_keys"
+        }
+        json_kwargs = {k: v for k, v in kwargs.items() if k in json_keys}
+        dump_kwargs = {k: v for k, v in kwargs.items() if k not in json_keys}
+        return json.dumps(self.model_dump(*args, **dump_kwargs), **json_kwargs)
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
 class ReviewReport(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")
     file_reports: List[FileReport] = Field(default_factory=list, description="List of file reports")
@@ -135,7 +157,10 @@ class ReviewReport(BaseModel):
                 self.evaluation_metrics = None
 
     def model_dump(self, *args, **kwargs):
-        return super().model_dump(*args, **kwargs)
+        data = super().model_dump(*args, **kwargs)
+        if self.file_reports:
+            data["file_reports"] = [report.model_dump(*args, **kwargs) for report in self.file_reports]
+        return data
 
     def model_dump_json(self, *args, **kwargs):
         import json
