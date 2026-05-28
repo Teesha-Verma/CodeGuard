@@ -79,7 +79,8 @@ def test_summary_stats_with_issues():
     assert stats["total_issues"] == 3
     assert stats["by_severity"]["high"] == 1
     assert stats["by_severity"]["critical"] == 1
-    assert stats["by_source"]["llm"] == 2
-    assert stats["by_source"]["linter"] == 1
+    assert stats["detection_sources"]["llm"] == 2
+    assert stats["detection_sources"]["linter"] == 1
+    assert stats["reasoning_sources"]["static_analysis"] == 3
     assert stats["avg_confidence"] == round((0.9 + 0.7 + 0.95) / 3, 2)
     assert stats["evaluation_available"] is True

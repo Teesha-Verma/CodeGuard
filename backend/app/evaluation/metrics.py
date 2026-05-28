@@ -12,7 +12,6 @@ class MetricsCalculator:
                 "style_findings": 0,
                 "suppressed_findings": 0,
                 "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
-                "by_source": {},
                 "avg_confidence": None,
                 "avg_meaningful_confidence": None,
                 "avg_style_confidence": None,
@@ -46,7 +45,6 @@ class MetricsCalculator:
             "style_findings": style_count,
             "suppressed_findings": suppressed_count,
             "by_severity": {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0},
-            "by_source": {},
             "detection_sources": {},
             "reasoning_sources": {},
             "avg_confidence": 0.0,
@@ -67,17 +65,13 @@ class MetricsCalculator:
             else:
                 stats["by_severity"]["medium"] += 1
                 
-            # Map sources (legacy compatibility)
+            # Map sources (fallback compatibility)
             srcs = issue.get("sources", [])
             if not srcs and "source" in issue:
                 old_src = issue["source"]
                 if hasattr(old_src, "value"):
                     old_src = old_src.value
                 srcs = [str(old_src)]
-                
-            for src in srcs:
-                src_key = str(src).lower()
-                stats["by_source"][src_key] = stats["by_source"].get(src_key, 0) + 1
                 
             # Map separated detection and reasoning sources
             det_srcs = issue.get("detection_sources", [])
