@@ -1,0 +1,372 @@
+{
+  "review_id": "6d32731c-c81c-4ce0-ad81-87c9812838f4",
+  "file_reports": [
+    {
+      "file_path": "src/requests/models.py",
+      "issues": [],
+      "meaningful_issues": [],
+      "style_findings": [
+        {
+          "line": 1043,
+          "severity": "low",
+          "confidence": 0.6,
+          "issue": "line too long (90 > 79 characters)",
+          "root_cause": "Line 1043 stretches too far horizontally (79 characters) characters), which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult.",
+          "trigger_condition": "This rule is triggered when a single line of code exceeds the recommended character limit.",
+          "fix": "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation.",
+          "patch": null,
+          "issue_type": "code_smell",
+          "sources": [
+            "flake8",
+            "static_analysis"
+          ],
+          "reasoning_trace": [
+            "Base confidence of 0.40 established.",
+            "Single linter match detected (+0.20): flake8",
+            "Response validated against deterministic evidence constraints (+0.10).",
+            "Low-signal penalty (-0.15) applied.",
+            "Changed-code confidence boost (+0.15) applied.",
+            "Confidence capped at 0.60 due to low-signal category.",
+            "Evidence strength calculated: 0.20",
+            "Reasoning activation threshold: 0.50",
+            "Reasoning engine activated: False",
+            "Bypassed LLM reasoning. Static analysis explanation generated."
+          ],
+          "evidence": {
+            "ast_nodes": [],
+            "linter_rules": [
+              {
+                "tool": "flake8",
+                "rule_id": "E501",
+                "line": 1043,
+                "message": "line too long (90 > 79 characters)"
+              }
+            ],
+            "trigger_lines": [
+              1043
+            ]
+          },
+          "signal_priority": "low",
+          "issue_category": "style-only violations",
+          "is_low_signal": true,
+          "detection_source": "flake8",
+          "reasoning_source": "static_analysis",
+          "priority_score": 0.42,
+          "detection_sources": [
+            "flake8"
+          ]
+        },
+        {
+          "line": 1045,
+          "severity": "low",
+          "confidence": 0.6,
+          "issue": "line too long (85 > 79 characters)",
+          "root_cause": "Line 1045 stretches too far horizontally (79 characters) characters), which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult.",
+          "trigger_condition": "This rule is triggered when a single line of code exceeds the recommended character limit.",
+          "fix": "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation.",
+          "patch": null,
+          "issue_type": "code_smell",
+          "sources": [
+            "flake8",
+            "static_analysis"
+          ],
+          "reasoning_trace": [
+            "Base confidence of 0.40 established.",
+            "Single linter match detected (+0.20): flake8",
+            "Response validated against deterministic evidence constraints (+0.10).",
+            "Low-signal penalty (-0.15) applied.",
+            "Changed-code confidence boost (+0.15) applied.",
+            "Confidence capped at 0.60 due to low-signal category.",
+            "Evidence strength calculated: 0.20",
+            "Reasoning activation threshold: 0.50",
+            "Reasoning engine activated: False",
+            "Bypassed LLM reasoning. Static analysis explanation generated."
+          ],
+          "evidence": {
+            "ast_nodes": [],
+            "linter_rules": [
+              {
+                "tool": "flake8",
+                "rule_id": "E501",
+                "line": 1045,
+                "message": "line too long (85 > 79 characters)"
+              }
+            ],
+            "trigger_lines": [
+              1045
+            ]
+          },
+          "signal_priority": "low",
+          "issue_category": "style-only violations",
+          "is_low_signal": true,
+          "detection_source": "flake8",
+          "reasoning_source": "static_analysis",
+          "priority_score": 0.42,
+          "detection_sources": [
+            "flake8"
+          ]
+        },
+        {
+          "line": 1046,
+          "severity": "low",
+          "confidence": 0.6,
+          "issue": "line too long (83 > 79 characters)",
+          "root_cause": "Line 1046 stretches too far horizontally (79 characters) characters), which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult.",
+          "trigger_condition": "This rule is triggered when a single line of code exceeds the recommended character limit.",
+          "fix": "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation.",
+          "patch": null,
+          "issue_type": "code_smell",
+          "sources": [
+            "flake8",
+            "static_analysis"
+          ],
+          "reasoning_trace": [
+            "Base confidence of 0.40 established.",
+            "Single linter match detected (+0.20): flake8",
+            "Response validated against deterministic evidence constraints (+0.10).",
+            "Low-signal penalty (-0.15) applied.",
+            "Changed-code confidence boost (+0.15) applied.",
+            "Confidence capped at 0.60 due to low-signal category.",
+            "Evidence strength calculated: 0.20",
+            "Reasoning activation threshold: 0.50",
+            "Reasoning engine activated: False",
+            "Bypassed LLM reasoning. Static analysis explanation generated."
+          ],
+          "evidence": {
+            "ast_nodes": [],
+            "linter_rules": [
+              {
+                "tool": "flake8",
+                "rule_id": "E501",
+                "line": 1046,
+                "message": "line too long (83 > 79 characters)"
+              }
+            ],
+            "trigger_lines": [
+              1046
+            ]
+          },
+          "signal_priority": "low",
+          "issue_category": "style-only violations",
+          "is_low_signal": true,
+          "detection_source": "flake8",
+          "reasoning_source": "static_analysis",
+          "priority_score": 0.42,
+          "detection_sources": [
+            "flake8"
+          ]
+        }
+      ],
+      "suppressed_findings": [],
+      "ast_metadata": null,
+      "ast_summary": {
+        "function_count": 52,
+        "class_count": 5,
+        "dangerous_patterns": 0
+      },
+      "linter_findings": [
+        {
+          "rule": "E501",
+          "message": "line too long (90 > 79 characters)",
+          "line": 1043,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E501",
+          "message": "line too long (85 > 79 characters)",
+          "line": 1045,
+          "tool": "flake8"
+        },
+        {
+          "rule": "E501",
+          "message": "line too long (83 > 79 characters)",
+          "line": 1046,
+          "tool": "flake8"
+        }
+      ]
+    }
+  ],
+  "meaningful_issues": [],
+  "style_findings": [
+    {
+      "line": 1043,
+      "severity": "low",
+      "confidence": 0.6,
+      "issue": "line too long (90 > 79 characters)",
+      "root_cause": "Line 1043 stretches too far horizontally (79 characters) characters), which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult.",
+      "trigger_condition": "This rule is triggered when a single line of code exceeds the recommended character limit.",
+      "fix": "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation.",
+      "patch": null,
+      "issue_type": "code_smell",
+      "sources": [
+        "flake8",
+        "static_analysis"
+      ],
+      "reasoning_trace": [
+        "Base confidence of 0.40 established.",
+        "Single linter match detected (+0.20): flake8",
+        "Response validated against deterministic evidence constraints (+0.10).",
+        "Low-signal penalty (-0.15) applied.",
+        "Changed-code confidence boost (+0.15) applied.",
+        "Confidence capped at 0.60 due to low-signal category.",
+        "Evidence strength calculated: 0.20",
+        "Reasoning activation threshold: 0.50",
+        "Reasoning engine activated: False",
+        "Bypassed LLM reasoning. Static analysis explanation generated."
+      ],
+      "evidence": {
+        "ast_nodes": [],
+        "linter_rules": [
+          {
+            "tool": "flake8",
+            "rule_id": "E501",
+            "line": 1043,
+            "message": "line too long (90 > 79 characters)"
+          }
+        ],
+        "trigger_lines": [
+          1043
+        ]
+      },
+      "signal_priority": "low",
+      "issue_category": "style-only violations",
+      "is_low_signal": true,
+      "detection_source": "flake8",
+      "reasoning_source": "static_analysis",
+      "priority_score": 0.42,
+      "detection_sources": [
+        "flake8"
+      ]
+    },
+    {
+      "line": 1045,
+      "severity": "low",
+      "confidence": 0.6,
+      "issue": "line too long (85 > 79 characters)",
+      "root_cause": "Line 1045 stretches too far horizontally (79 characters) characters), which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult.",
+      "trigger_condition": "This rule is triggered when a single line of code exceeds the recommended character limit.",
+      "fix": "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation.",
+      "patch": null,
+      "issue_type": "code_smell",
+      "sources": [
+        "flake8",
+        "static_analysis"
+      ],
+      "reasoning_trace": [
+        "Base confidence of 0.40 established.",
+        "Single linter match detected (+0.20): flake8",
+        "Response validated against deterministic evidence constraints (+0.10).",
+        "Low-signal penalty (-0.15) applied.",
+        "Changed-code confidence boost (+0.15) applied.",
+        "Confidence capped at 0.60 due to low-signal category.",
+        "Evidence strength calculated: 0.20",
+        "Reasoning activation threshold: 0.50",
+        "Reasoning engine activated: False",
+        "Bypassed LLM reasoning. Static analysis explanation generated."
+      ],
+      "evidence": {
+        "ast_nodes": [],
+        "linter_rules": [
+          {
+            "tool": "flake8",
+            "rule_id": "E501",
+            "line": 1045,
+            "message": "line too long (85 > 79 characters)"
+          }
+        ],
+        "trigger_lines": [
+          1045
+        ]
+      },
+      "signal_priority": "low",
+      "issue_category": "style-only violations",
+      "is_low_signal": true,
+      "detection_source": "flake8",
+      "reasoning_source": "static_analysis",
+      "priority_score": 0.42,
+      "detection_sources": [
+        "flake8"
+      ]
+    },
+    {
+      "line": 1046,
+      "severity": "low",
+      "confidence": 0.6,
+      "issue": "line too long (83 > 79 characters)",
+      "root_cause": "Line 1046 stretches too far horizontally (79 characters) characters), which disrupts the vertical reading flow and makes side-by-side diff reviews more difficult.",
+      "trigger_condition": "This rule is triggered when a single line of code exceeds the recommended character limit.",
+      "fix": "Consider breaking this line into multiple lines by extracting intermediate variables, wrapping parameters, or using parentheses for implicit continuation.",
+      "patch": null,
+      "issue_type": "code_smell",
+      "sources": [
+        "flake8",
+        "static_analysis"
+      ],
+      "reasoning_trace": [
+        "Base confidence of 0.40 established.",
+        "Single linter match detected (+0.20): flake8",
+        "Response validated against deterministic evidence constraints (+0.10).",
+        "Low-signal penalty (-0.15) applied.",
+        "Changed-code confidence boost (+0.15) applied.",
+        "Confidence capped at 0.60 due to low-signal category.",
+        "Evidence strength calculated: 0.20",
+        "Reasoning activation threshold: 0.50",
+        "Reasoning engine activated: False",
+        "Bypassed LLM reasoning. Static analysis explanation generated."
+      ],
+      "evidence": {
+        "ast_nodes": [],
+        "linter_rules": [
+          {
+            "tool": "flake8",
+            "rule_id": "E501",
+            "line": 1046,
+            "message": "line too long (83 > 79 characters)"
+          }
+        ],
+        "trigger_lines": [
+          1046
+        ]
+      },
+      "signal_priority": "low",
+      "issue_category": "style-only violations",
+      "is_low_signal": true,
+      "detection_source": "flake8",
+      "reasoning_source": "static_analysis",
+      "priority_score": 0.42,
+      "detection_sources": [
+        "flake8"
+      ]
+    }
+  ],
+  "suppressed_findings": [],
+  "summary_stats": {
+    "total_issues": 0,
+    "meaningful_issues": 0,
+    "style_findings": 3,
+    "suppressed_findings": 0,
+    "by_severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 3,
+      "info": 0
+    },
+    "by_source": {
+      "flake8": 3,
+      "static_analysis": 3
+    },
+    "detection_sources": {
+      "flake8": 3
+    },
+    "reasoning_sources": {
+      "static_analysis": 3
+    },
+    "avg_confidence": 0.6,
+    "avg_meaningful_confidence": null,
+    "avg_style_confidence": 0.6,
+    "evaluation_available": true
+  },
+  "evaluation_metrics": null,
+  "trace_id": "6d32731c-c81c-4ce0-ad81-87c9812838f4"
+}

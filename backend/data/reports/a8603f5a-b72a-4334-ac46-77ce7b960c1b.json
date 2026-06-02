@@ -1,0 +1,199 @@
+{
+  "review_id": "a8603f5a-b72a-4334-ac46-77ce7b960c1b",
+  "file_reports": [
+    {
+      "file_path": "test.py",
+      "issues": [
+        {
+          "line": 1,
+          "severity": "medium",
+          "confidence": 0.9,
+          "issue": "Mutable default argument in function 'foo'",
+          "root_cause": "The function 'foo' has a mutable default argument 'x' which is a list, causing it to retain its state across function calls",
+          "trigger_condition": "When the function 'foo' is called without an argument for 'x', it uses the default mutable list",
+          "fix": "The issue can be fixed by changing the default argument to 'None' and initializing the list inside the function, for example: def foo(x=None): if x is None: x = []",
+          "patch": "def foo(x=None):\n    if x is None: x = []\n    x.append(1)\n    return x",
+          "issue_type": "code_smell",
+          "sources": [
+            "ast",
+            "llm"
+          ],
+          "reasoning_trace": [
+            "Base confidence of 0.40 established.",
+            "AST mutation or scope pattern match (+0.25) confirmed.",
+            "Response validated against deterministic evidence constraints (+0.10).",
+            "Changed-code confidence boost (+0.15) applied.",
+            "Evidence strength calculated: 1.00",
+            "Reasoning activation threshold: 0.50",
+            "Reasoning engine activated: True",
+            "LLM generated explanations grounded on ast"
+          ],
+          "evidence": {
+            "ast_nodes": [
+              {
+                "node_type": "HeuristicNode",
+                "line": 1,
+                "pattern": "mutable_default",
+                "message": "Mutable default argument in function 'foo'",
+                "evidence_strength": 1.0
+              }
+            ],
+            "linter_rules": [],
+            "trigger_lines": [
+              1
+            ]
+          },
+          "signal_priority": "medium",
+          "issue_category": "runtime logic risks",
+          "is_low_signal": false,
+          "detection_source": "ast",
+          "reasoning_source": "llm",
+          "priority_score": 0.82,
+          "detection_sources": [
+            "ast"
+          ]
+        }
+      ],
+      "meaningful_issues": [
+        {
+          "line": 1,
+          "severity": "medium",
+          "confidence": 0.9,
+          "issue": "Mutable default argument in function 'foo'",
+          "root_cause": "The function 'foo' has a mutable default argument 'x' which is a list, causing it to retain its state across function calls",
+          "trigger_condition": "When the function 'foo' is called without an argument for 'x', it uses the default mutable list",
+          "fix": "The issue can be fixed by changing the default argument to 'None' and initializing the list inside the function, for example: def foo(x=None): if x is None: x = []",
+          "patch": "def foo(x=None):\n    if x is None: x = []\n    x.append(1)\n    return x",
+          "issue_type": "code_smell",
+          "sources": [
+            "ast",
+            "llm"
+          ],
+          "reasoning_trace": [
+            "Base confidence of 0.40 established.",
+            "AST mutation or scope pattern match (+0.25) confirmed.",
+            "Response validated against deterministic evidence constraints (+0.10).",
+            "Changed-code confidence boost (+0.15) applied.",
+            "Evidence strength calculated: 1.00",
+            "Reasoning activation threshold: 0.50",
+            "Reasoning engine activated: True",
+            "LLM generated explanations grounded on ast"
+          ],
+          "evidence": {
+            "ast_nodes": [
+              {
+                "node_type": "HeuristicNode",
+                "line": 1,
+                "pattern": "mutable_default",
+                "message": "Mutable default argument in function 'foo'",
+                "evidence_strength": 1.0
+              }
+            ],
+            "linter_rules": [],
+            "trigger_lines": [
+              1
+            ]
+          },
+          "signal_priority": "medium",
+          "issue_category": "runtime logic risks",
+          "is_low_signal": false,
+          "detection_source": "ast",
+          "reasoning_source": "llm",
+          "priority_score": 0.82,
+          "detection_sources": [
+            "ast"
+          ]
+        }
+      ],
+      "style_findings": [],
+      "suppressed_findings": [],
+      "ast_metadata": null,
+      "ast_summary": {
+        "function_count": 1,
+        "class_count": 0,
+        "dangerous_patterns": 0
+      },
+      "linter_findings": []
+    }
+  ],
+  "meaningful_issues": [
+    {
+      "line": 1,
+      "severity": "medium",
+      "confidence": 0.9,
+      "issue": "Mutable default argument in function 'foo'",
+      "root_cause": "The function 'foo' has a mutable default argument 'x' which is a list, causing it to retain its state across function calls",
+      "trigger_condition": "When the function 'foo' is called without an argument for 'x', it uses the default mutable list",
+      "fix": "The issue can be fixed by changing the default argument to 'None' and initializing the list inside the function, for example: def foo(x=None): if x is None: x = []",
+      "patch": "def foo(x=None):\n    if x is None: x = []\n    x.append(1)\n    return x",
+      "issue_type": "code_smell",
+      "sources": [
+        "ast",
+        "llm"
+      ],
+      "reasoning_trace": [
+        "Base confidence of 0.40 established.",
+        "AST mutation or scope pattern match (+0.25) confirmed.",
+        "Response validated against deterministic evidence constraints (+0.10).",
+        "Changed-code confidence boost (+0.15) applied.",
+        "Evidence strength calculated: 1.00",
+        "Reasoning activation threshold: 0.50",
+        "Reasoning engine activated: True",
+        "LLM generated explanations grounded on ast"
+      ],
+      "evidence": {
+        "ast_nodes": [
+          {
+            "node_type": "HeuristicNode",
+            "line": 1,
+            "pattern": "mutable_default",
+            "message": "Mutable default argument in function 'foo'",
+            "evidence_strength": 1.0
+          }
+        ],
+        "linter_rules": [],
+        "trigger_lines": [
+          1
+        ]
+      },
+      "signal_priority": "medium",
+      "issue_category": "runtime logic risks",
+      "is_low_signal": false,
+      "detection_source": "ast",
+      "reasoning_source": "llm",
+      "priority_score": 0.82,
+      "detection_sources": [
+        "ast"
+      ]
+    }
+  ],
+  "style_findings": [],
+  "suppressed_findings": [],
+  "summary_stats": {
+    "total_issues": 1,
+    "meaningful_issues": 1,
+    "style_findings": 0,
+    "suppressed_findings": 0,
+    "by_severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 1,
+      "low": 0,
+      "info": 0
+    },
+    "by_source": {
+      "ast": 1,
+      "llm": 1
+    },
+    "detection_sources": {
+      "ast": 1
+    },
+    "reasoning_sources": {
+      "llm": 1
+    },
+    "avg_confidence": 0.9,
+    "evaluation_available": true
+  },
+  "evaluation_metrics": null,
+  "trace_id": "a8603f5a-b72a-4334-ac46-77ce7b960c1b"
+}
