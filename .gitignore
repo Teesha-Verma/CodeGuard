@@ -276,4 +276,4 @@ repos/
 
 codeguard.db
 data/
-app/llm/llm_client.py
+backend/app/llm/llm_client.py
