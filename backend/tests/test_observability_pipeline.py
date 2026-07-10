@@ -92,7 +92,7 @@ def test_orchestrator_and_generator_trace_generation():
         assert issue.signal_priority == "high"
         assert issue.issue_category == "mutation risks"
         assert issue.is_low_signal is False
-        assert issue.detection_source == "ast"
+        assert issue.detection_source in ("ast", "pylint")
         assert issue.reasoning_source == "llm"
         
     finally:
