@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Integer, Float, Boolean, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, String, Integer, Float, Boolean, ForeignKey, DateTime
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.database import Base
@@ -31,10 +32,10 @@ class ReviewIssueModel(Base):
     patch = Column(String, nullable=True)
     issue_type = Column(String)
     
-    # Flexible JSON fields for V1 output structures
-    sources = Column(JSON, nullable=True)
-    reasoning_trace = Column(JSON, nullable=True)
-    evidence = Column(JSON, nullable=True)
+    # PostgreSQL JSONB fields for V1 output structures
+    sources = Column(JSONB, nullable=True)
+    reasoning_trace = Column(JSONB, nullable=True)
+    evidence = Column(JSONB, nullable=True)
     
     review = relationship("Review", back_populates="issues")
 
@@ -46,7 +47,7 @@ class PipelineTrace(Base):
     stage = Column(String)
     duration_ms = Column(Float)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    input_data = Column(JSON, nullable=True)
-    output_data = Column(JSON, nullable=True)
+    input_data = Column(JSONB, nullable=True)
+    output_data = Column(JSONB, nullable=True)
     
     review = relationship("Review", back_populates="traces")

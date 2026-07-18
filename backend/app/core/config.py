@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from typing import Optional
 
 
@@ -22,9 +23,23 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
-    # ── Database ─────────────────────────────────────────────────
-    # SQLite for dev, PostgreSQL for production
-    DATABASE_URL: str = "sqlite:///./codeguard.db"
+    # ── Database (PostgreSQL) ────────────────────────────────────
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "codeguard"
+    POSTGRES_USER: str = "codeguard"
+    POSTGRES_PASSWORD: str = "codeguard"
+    DATABASE_URL: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _assemble_database_url(self) -> "Settings":
+        """Auto-construct DATABASE_URL from POSTGRES_* components if not set."""
+        if not self.DATABASE_URL:
+            self.DATABASE_URL = (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+            )
+        return self
 
     # ── LLM ──────────────────────────────────────────────────────
     LLM_PROVIDER: str = "groq"  # "groq" | "openai"

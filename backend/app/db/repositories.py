@@ -11,16 +11,24 @@ class ReviewRepository:
         
     def create_review(self, review_id: str, repo_url: str, pr_number: int) -> Review:
         review = Review(id=review_id, repo_url=repo_url, pr_number=pr_number, status="started")
-        self.db.add(review)
-        self.db.commit()
-        self.db.refresh(review)
+        try:
+            self.db.add(review)
+            self.db.commit()
+            self.db.refresh(review)
+        except Exception:
+            self.db.rollback()
+            raise
         return review
         
     def update_status(self, review_id: str, status: str):
         review = self.db.query(Review).filter(Review.id == review_id).first()
         if review:
-            review.status = status
-            self.db.commit()
+            try:
+                review.status = status
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                raise
             
     def save_issue(self, review_id: str, file_path: str, issue_data: dict):
         issue_id = str(uuid.uuid4())
@@ -52,8 +60,12 @@ class ReviewRepository:
             reasoning_trace=issue_data.get("reasoning_trace"),
             evidence=evidence
         )
-        self.db.add(issue)
-        self.db.commit()
+        try:
+            self.db.add(issue)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
 
     def get_review(self, review_id: str) -> Optional[Review]:
         return self.db.query(Review).filter(Review.id == review_id).first()
@@ -68,6 +80,10 @@ class ReviewRepository:
             input_data=input_data,
             output_data=output_data
         )
-        self.db.add(trace)
-        self.db.commit()
+        try:
+            self.db.add(trace)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
         return trace

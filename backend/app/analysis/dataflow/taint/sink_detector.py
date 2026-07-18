@@ -44,7 +44,7 @@ _DEFAULT_SINKS: Dict[str, str] = {
     "cursor.execute": "sql_injection",
     "cursor.executemany": "sql_injection",
     "connection.execute": "sql_injection",
-    "sqlite3.execute": "sql_injection",
+    "psycopg2.execute": "sql_injection",
     "db.execute": "sql_injection",
     "open": "unsafe_file_access",
     "io.open": "unsafe_file_access",
