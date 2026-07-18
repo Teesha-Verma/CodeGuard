@@ -1,15 +1,38 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: codeguard
+      POSTGRES_USER: codeguard
+      POSTGRES_PASSWORD: codeguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codeguard -d codeguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./codeguard.db
+      - DATABASE_URL=postgresql://codeguard:codeguard@postgres:5432/codeguard
       - LLM_PROVIDER=gemini
       - LLM_MODEL=gemini-2.0-flash
     env_file:
       - .env
     volumes:
       - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

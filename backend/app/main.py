@@ -1,4 +1,5 @@
 import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router as review_router
@@ -6,16 +7,23 @@ from app.core.logger import get_logger
 from app.core.config import get_settings
 from app.db.database import engine, Base
 
-# Initialize database tables
-Base.metadata.create_all(bind=engine)
 
 settings = get_settings()
 logger = get_logger("codeguard.main")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: initialize database tables on startup."""
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Production-grade hybrid static-analysis + LLM reasoning code review engine."
+    description="Production-grade hybrid static-analysis + LLM reasoning code review engine.",
+    lifespan=lifespan,
 )
 
 # CORS configuration
