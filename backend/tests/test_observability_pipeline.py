@@ -1,12 +1,32 @@
 import os
 import uuid
-from app.db.database import SessionLocal, Base, engine
+import pytest
+from sqlalchemy import text
+from app.db.database import SessionLocal, Base, engine, _get_engine
 from app.db.repositories import ReviewRepository
 from app.db.models import Review, PipelineTrace, ReviewIssueModel
 from app.pipeline.orchestrator import PipelineOrchestrator
 from app.diff.diff_parser import DiffFile
 
 
+def _pg_available() -> bool:
+    """Check if a PostgreSQL connection can be established."""
+    try:
+        eng = _get_engine()
+        with eng.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
+
+
+requires_postgres = pytest.mark.skipif(
+    not _pg_available(),
+    reason="PostgreSQL is not available",
+)
+
+
+@requires_postgres
 def test_database_trace_saving():
     """Verify that save_trace creates trace records in the database."""
     db = SessionLocal()
