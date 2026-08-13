@@ -1,0 +1,12 @@
+{
+  "categories": {
+    "security": {
+      "owasp": [
+        "top10",
+        "api_security",
+        "proactive_controls",
+        "cheat_sheets"
+      ]
+    }
+  }
+}
