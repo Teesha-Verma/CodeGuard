@@ -15,7 +15,7 @@ class CacheEntry:
         return time.time() > self.expires_at
 
 class LLMResponseCache:
-    """In-memory LRU cache for storing Groq LLM responses."""
+    """In-memory LRU cache for storing Gemini LLM responses."""
 
     def __init__(self, max_size: int = 1000, ttl_seconds: int = 3600, default_ttl_seconds: int = 3600):
         """

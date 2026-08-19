@@ -102,3 +102,7 @@ class RetrievalEngine:
         # 6. Apply post filters and return top_k
         filtered = self.filter_engine.apply_post_filters(reranked, filters)
         return filtered[:top_k]
+
+    def search(self, query: RetrievalQuery, top_k: int = 10, hybrid_search: bool = True) -> List[DetailedSearchResult]:
+        """Alias for retrieve."""
+        return self.retrieve(query=query, top_k=top_k, hybrid_search=hybrid_search)

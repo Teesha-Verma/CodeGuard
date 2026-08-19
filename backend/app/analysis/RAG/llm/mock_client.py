@@ -6,14 +6,14 @@ from .base_client import BaseLLMClient
 from ..responses.review_schema import ReviewResponse, ReviewFinding
 
 
-class MockGroqClient(BaseLLMClient):
+class MockGeminiClient(BaseLLMClient):
     """
     A mock LLM client that returns deterministic responses.
     """
 
     @property
     def provider_name(self) -> str:
-        return "mock_groq"
+        return "mock_gemini"
 
     def generate_review(self, prompt: Any, config: Any = None) -> ReviewResponse:
         """
@@ -29,7 +29,7 @@ class MockGroqClient(BaseLLMClient):
             priority="high",
             remediation="Use literal_eval instead of eval.",
             code_suggestion="ast.literal_eval(user_input)",
-            references=["CWE-94"]
+            references=["CWE-94"],
         )
 
         return ReviewResponse(
@@ -43,7 +43,7 @@ class MockGroqClient(BaseLLMClient):
             remediation_summary="Fix the eval statement.",
             code_suggestions=["Use ast.literal_eval"],
             references=["https://cwe.mitre.org/data/definitions/94.html"],
-            review_metadata={"mock": True}
+            review_metadata={"mock": True},
         )
 
     def generate_raw(self, prompt_text: str, system_instruction: str = "") -> str:
@@ -51,3 +51,6 @@ class MockGroqClient(BaseLLMClient):
         Return a mock raw text response.
         """
         return "This is a mock raw response."
+
+
+MockGroqClient = MockGeminiClient  # Backward compatibility alias

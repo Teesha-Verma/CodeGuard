@@ -1,15 +1,16 @@
-"""Unit tests for Phase 4: Groq LLM Integration Layer in app.analysis.RAG."""
+"""Unit tests for Phase 4: Gemini LLM Integration Layer in app.analysis.RAG."""
 
 import os
 import pytest
+from unittest.mock import MagicMock, patch
 
-from app.analysis.RAG.config.llm_config import LLMConfig, GroqConfig
+from app.analysis.RAG.config.llm_config import LLMConfig, GeminiConfig
 from app.analysis.RAG.responses.review_schema import ReviewFinding, ReviewResponse, TypedReviewObject
 from app.analysis.RAG.validation.response_validator import ResponseValidator, ResponseValidationResult
 from app.analysis.RAG.retry.retry_engine import RetryEngine
 from app.analysis.RAG.llm.base_client import BaseLLMClient
-from app.analysis.RAG.llm.mock_client import MockGroqClient
-from app.analysis.RAG.llm.groq_client import GroqClient
+from app.analysis.RAG.llm.mock_client import MockGeminiClient
+from app.analysis.RAG.llm.gemini_client import GeminiClient
 from app.analysis.RAG.telemetry.llm_telemetry import LLMTelemetryManager, LLMUsageMetrics
 from app.analysis.RAG.cache.llm_response_cache import LLMResponseCache
 
@@ -46,12 +47,12 @@ class TestReviewSchemaAndConfig:
         assert len(response.findings) == 1
         assert response.confidence == 0.95
 
-    def test_llm_config_defaults_and_env(self, monkeypatch):
-        monkeypatch.setenv("GROQ_API_KEY", "test_groq_key_123")
-        monkeypatch.setenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    def test_gemini_config_defaults_and_env(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_API_KEY", "test_gemini_key_123")
+        monkeypatch.setenv("GEMINI_LLM_MODEL", "gemini-3.6-flash")
         config = LLMConfig.from_env()
-        assert config.api_key == "test_groq_key_123"
-        assert config.model == "llama-3.3-70b-versatile"
+        assert config.api_key == "test_gemini_key_123"
+        assert config.model == "gemini-3.6-flash"
         assert config.json_mode is True
 
 
@@ -108,23 +109,48 @@ class TestRetryEngine:
         assert attempts == 2
 
 
-class TestMockAndGroqLLMClient:
-    """Test BaseLLMClient implementations (Mock & Groq)."""
+class TestMockAndGeminiLLMClient:
+    """Test BaseLLMClient implementations (Mock & Gemini)."""
 
-    def test_mock_groq_client(self):
-        client = MockGroqClient()
-        assert client.provider_name == "mock_groq"
+    def test_mock_gemini_client(self):
+        client = MockGeminiClient()
+        assert "mock" in client.provider_name
 
         review = client.generate_review(prompt="Review user input handling")
         assert isinstance(review, (ReviewResponse, TypedReviewObject))
         assert review.confidence >= 0.8
         assert len(review.findings) > 0
 
-    def test_groq_client_offline_validation(self):
-        config = GroqConfig(api_key="mock_key", model="llama-3.3-70b-versatile")
-        client = GroqClient(config=config)
-        assert client.provider_name == "groq"
-        assert client.config.model == "llama-3.3-70b-versatile"
+    def test_gemini_client_initialization(self):
+        config = GeminiConfig(api_key="mock_key", model="gemini-3.6-flash")
+        client = GeminiClient(config=config)
+        assert client.provider_name == "gemini"
+        assert client.config.model == "gemini-3.6-flash"
+
+    def test_gemini_client_generate_review_with_mocked_genai(self):
+        config = GeminiConfig(api_key="test_api_key", model="gemini-3.6-flash")
+        client = GeminiClient(config=config)
+
+        mock_response = MagicMock()
+        mock_response.text = '{"review_summary": "No critical issues", "overall_severity": "low", "findings": [], "evidence_summary": "", "reasoning_trace": "", "confidence": 0.95, "priority": "low", "remediation_summary": "", "code_suggestions": [], "references": [], "review_metadata": {}}'
+
+        mock_genai_client = MagicMock()
+        mock_genai_client.models.generate_content.return_value = mock_response
+        client._client = mock_genai_client
+
+        review = client.generate_review(prompt="Analyze this code")
+        assert isinstance(review, ReviewResponse)
+        assert review.review_summary == "No critical issues"
+        assert review.overall_severity == "low"
+
+        # Verify no deprecated sampling params were passed
+        mock_genai_client.models.generate_content.assert_called_once()
+        _, kwargs = mock_genai_client.models.generate_content.call_args
+        gen_config = kwargs.get("config")
+        if gen_config is not None:
+            assert not hasattr(gen_config, "temperature") or gen_config.temperature is None
+            assert not hasattr(gen_config, "top_p") or gen_config.top_p is None
+            assert not hasattr(gen_config, "top_k") or gen_config.top_k is None
 
 
 class TestTelemetryAndResponseCache:
@@ -133,6 +159,7 @@ class TestTelemetryAndResponseCache:
     def test_telemetry_manager(self):
         telemetry = LLMTelemetryManager()
         metrics = LLMUsageMetrics(
+            provider="gemini",
             prompt_tokens=150,
             completion_tokens=50,
             total_tokens=200,
@@ -140,7 +167,7 @@ class TestTelemetryAndResponseCache:
             latency_ms=320.0,
             request_size_bytes=600,
             response_size_bytes=200,
-            model_name="llama-3.3-70b-versatile",
+            model_name="gemini-3.6-flash",
             success=True,
             retry_count=0,
         )
@@ -149,8 +176,9 @@ class TestTelemetryAndResponseCache:
         assert stats["total_requests"] == 1
         assert stats["total_tokens"] == 200
 
-        sanitized = telemetry.sanitize_prompt("Authorization: Bearer gsk_secret_12345")
+        sanitized = telemetry.sanitize_prompt("Authorization: Bearer gsk_secret_12345 AIzaSyDummySecretKey1234567890abcdef")
         assert "gsk_secret_12345" not in sanitized
+        assert "AIzaSyDummySecretKey1234567890abcdef" not in sanitized
 
     def test_llm_response_cache(self):
         cache = LLMResponseCache(max_size=2, ttl_seconds=60)
@@ -167,9 +195,9 @@ class TestTelemetryAndResponseCache:
             references=[],
             review_metadata={},
         )
-        cache.put(prompt_text="Analyze test code", model_name="llama-3.3-70b-versatile", response=review)
+        cache.put(prompt_text="Analyze test code", model_name="gemini-3.6-flash", response=review)
 
-        cached = cache.get(prompt_text="Analyze test code", model_name="llama-3.3-70b-versatile")
+        cached = cache.get(prompt_text="Analyze test code", model_name="gemini-3.6-flash")
         assert cached is not None
         assert cached.review_summary == "Cached review summary"
         assert cache.stats["hits"] == 1

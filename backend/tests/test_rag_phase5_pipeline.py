@@ -142,7 +142,7 @@ class TestPipelineOrchestratorAndService:
     def test_rag_pipeline_service_end_to_end(self):
         service = RAGPipelineService()
         config = RAGPipelineConfig(
-            model_name="llama-3.3-70b-versatile",
+            model_name="gemini-3.6-flash",
             template_name="security_review",
             output_format="json",
             max_tokens=16000,

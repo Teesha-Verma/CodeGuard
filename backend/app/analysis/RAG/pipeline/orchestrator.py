@@ -16,7 +16,7 @@ from app.analysis.RAG.integration.stages import (
 
 class PipelineOrchestrator:
     """
-    Coordinates pipeline execution order (Static Analysis -> Retrieval -> Prompt Builder -> Groq LLM -> Review Merge).
+    Coordinates pipeline execution order (Static Analysis -> Retrieval -> Prompt Builder -> Gemini LLM -> Review Merge).
     Manages PipelineEventBus emissions.
     """
 
@@ -51,7 +51,7 @@ class PipelineOrchestrator:
 
         if stages is None:
             # Default pipeline stages:
-            # Static Analysis -> Retrieval -> Prompt Builder -> Groq LLM -> Review Merge
+            # Static Analysis -> Retrieval -> Prompt Builder -> Gemini LLM -> Review Merge
             stages = [
                 StaticAnalysisStage(),
                 RetrievalStage(),

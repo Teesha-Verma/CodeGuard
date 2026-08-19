@@ -1,12 +1,12 @@
 """In-memory vector store implementation.
 
 Simple in-memory storage with brute-force cosine similarity.
-Suitable for testing and small knowledge bases.
+Includes strict vector dimension validation to prevent dimension mismatch corruption.
 """
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Optional
 
 from app.analysis.RAG.models.documents import EmbeddingDocument, SearchResult
 from app.analysis.RAG.utils.logging import get_logger
@@ -42,14 +42,37 @@ def _matches_filters(metadata: dict[str, Any], filters: dict[str, Any]) -> bool:
 
 
 class InMemoryVectorStore(VectorStore):
-    """In-memory vector store with brute-force cosine similarity search."""
+    """In-memory vector store with brute-force cosine similarity search and dimension validation."""
 
-    def __init__(self) -> None:
+    def __init__(self, dimension: Optional[int] = None) -> None:
         self._documents: dict[str, EmbeddingDocument] = {}  # chunk_id -> doc
+        self._dimension: Optional[int] = dimension
+
+    @property
+    def dimension(self) -> Optional[int]:
+        return self._dimension
+
+    def _validate_vector_dimension(self, vector: list[float], chunk_id: str = "") -> None:
+        """Ensure vector dimensionality matches expected configured/established dimension."""
+        if not vector:
+            return
+        vec_len = len(vector)
+        if self._dimension is not None:
+            if vec_len != self._dimension:
+                identifier = f" for chunk '{chunk_id}'" if chunk_id else ""
+                raise ValueError(
+                    f"Vector dimension mismatch: expected configured dimension {self._dimension}, "
+                    f"got {vec_len}{identifier}. Silent truncation or padding is not permitted."
+                )
+        else:
+            # Dynamically adopt the dimension of the first indexed vector
+            self._dimension = vec_len
 
     def add_documents(self, documents: list[EmbeddingDocument]) -> int:
         added = 0
         for doc in documents:
+            if doc.embedding:
+                self._validate_vector_dimension(doc.embedding, doc.chunk_id)
             if doc.chunk_id not in self._documents:
                 self._documents[doc.chunk_id] = doc
                 added += 1
@@ -67,12 +90,10 @@ class InMemoryVectorStore(VectorStore):
     def update_documents(self, documents: list[EmbeddingDocument]) -> int:
         updated = 0
         for doc in documents:
-            if doc.chunk_id in self._documents:
-                self._documents[doc.chunk_id] = doc
-                updated += 1
-            else:
-                self._documents[doc.chunk_id] = doc
-                updated += 1
+            if doc.embedding:
+                self._validate_vector_dimension(doc.embedding, doc.chunk_id)
+            self._documents[doc.chunk_id] = doc
+            updated += 1
         return updated
 
     def search(
@@ -81,6 +102,14 @@ class InMemoryVectorStore(VectorStore):
         top_k: int = 10,
         filters: dict[str, Any] | None = None,
     ) -> list[SearchResult]:
+        if not query_embedding:
+            return []
+
+        if self._dimension is not None and len(query_embedding) != self._dimension:
+            raise ValueError(
+                f"Query vector dimension mismatch: expected {self._dimension}, got {len(query_embedding)}."
+            )
+
         candidates: list[tuple[float, EmbeddingDocument]] = []
 
         for doc in self._documents.values():

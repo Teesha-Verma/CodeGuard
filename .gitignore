@@ -175,6 +175,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -276,4 +278,3 @@ repos/
 
 codeguard.db
 data/
-backend/app/llm/llm_client.py

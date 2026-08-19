@@ -1,5 +1,5 @@
 """
-CodeGuard — Configuration management.
+CodeGuard V2 — Configuration management.
 
 Uses Pydantic Settings for environment-based configuration.
 Reads from .env file with fallback defaults for development.
@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from pydantic_settings import BaseSettings
-from pydantic import model_validator
 from typing import Optional
+from pydantic import model_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -19,9 +19,10 @@ class Settings(BaseSettings):
 
     # ── Application ──────────────────────────────────────────────
     APP_NAME: str = "CodeGuard"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
+    ENVIRONMENT: str = "development"
 
     # ── Database (PostgreSQL) ────────────────────────────────────
     POSTGRES_HOST: str = "localhost"
@@ -41,27 +42,104 @@ class Settings(BaseSettings):
             )
         return self
 
-    # ── LLM ──────────────────────────────────────────────────────
-    LLM_PROVIDER: str = "groq"  # "groq" | "openai"
-    GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    LLM_API_KEY: str = ""
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
-    LLM_TEMPERATURE: float = 0.2
-    LLM_MAX_TOKENS: int = 4096
-    LLM_TIMEOUT: int = 60
-
     # ── GitHub ───────────────────────────────────────────────────
     GITHUB_TOKEN: Optional[str] = None
+    GITHUB_API_URL: str = "https://api.github.com"
+    GITHUB_TIMEOUT: int = 30
 
-    # ── Paths ────────────────────────────────────────────────────
-    REPOS_DIR: str = "repos"
-    LOG_DIR: str = "logs"
+    # ── Gemini ───────────────────────────────────────────────────
+    GEMINI_API_KEY: str = ""
+    GEMINI_LLM_MODEL: str = "gemini-3.6-flash"
+    GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
+    GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com"
+    GEMINI_TIMEOUT: int = 60
+    GEMINI_MAX_RETRIES: int = 3
+
+    # ── LLM ──────────────────────────────────────────────────────
+    LLM_PROVIDER: str = "gemini"  # "gemini" | "mock" | "openai"
+    LLM_MODEL: str = "gemini-3.6-flash"
+    LLM_API_KEY: str = ""
+    LLM_MAX_TOKENS: int = 4096
+    LLM_TIMEOUT: int = 60
+    LLM_MAX_RETRIES: int = 3
+
+    # ── RAG ──────────────────────────────────────────────────────
+    RAG_ENABLED: bool = True
+    RAG_EMBEDDING_PROVIDER: str = "gemini"
+    RAG_EMBEDDING_MODEL: str = "gemini-embedding-2"
+    RAG_TOP_K: int = 10
+    RAG_RERANK_TOP_K: int = 5
+    RAG_SIMILARITY_THRESHOLD: float = 0.70
+    RAG_MAX_CONTEXT_CHUNKS: int = 10
+    RAG_MAX_CONTEXT_TOKENS: int = 8000
+    RAG_CHUNK_SIZE: int = 1000
+    RAG_CHUNK_OVERLAP: int = 150
+    RAG_CACHE_ENABLED: bool = True
+    RAG_CACHE_TTL: int = 3600
+    RAG_VECTOR_STORE: str = "memory"
+    RAG_KNOWLEDGE_PATH: str = "app/analysis/RAG/knowledge"
+
+    def get_resolved_knowledge_path(self) -> str:
+        """Resolve knowledge path to an existing absolute directory."""
+        import os
+        from pathlib import Path
+        candidate = Path(self.RAG_KNOWLEDGE_PATH)
+        if candidate.is_dir():
+            return str(candidate.resolve())
+        # Fallback to backend/app/analysis/RAG/knowledge
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        app_rag_kb = backend_dir / "app" / "analysis" / "RAG" / "knowledge"
+        if app_rag_kb.is_dir():
+            return str(app_rag_kb)
+        return str(candidate)
+
+    # ── Embeddings ───────────────────────────────────────────────
+    EMBEDDING_PROVIDER: str = "gemini"
+    EMBEDDING_MODEL: str = "gemini-embedding-2"
+    EMBEDDING_DIMENSION: int = 768
+    EMBEDDING_BATCH_SIZE: int = 32
+    EMBEDDING_TIMEOUT: int = 60
+    EMBEDDING_MAX_RETRIES: int = 3
+
+    # ── Analysis ─────────────────────────────────────────────────
+    MAX_FILE_SIZE_KB: int = 500
+    MAX_DIFF_FILES: int = 50
+    CONTEXT_WINDOW_LINES: int = 10
+    AST_ENABLED: bool = True
+    CFG_ENABLED: bool = True
+    CALL_GRAPH_ENABLED: bool = True
+    DATAFLOW_ENABLED: bool = True
+    REPOSITORY_INTELLIGENCE_ENABLED: bool = True
+    LINTERS_ENABLED: bool = True
+
+    # ── Static Analysis ──────────────────────────────────────────
+    PYLINT_ENABLED: bool = True
+    FLAKE8_ENABLED: bool = True
+    BANDIT_ENABLED: bool = True
 
     # ── Pipeline ─────────────────────────────────────────────────
-    MAX_FILE_SIZE_KB: int = 500
-    CONTEXT_WINDOW_LINES: int = 10
-    MAX_DIFF_FILES: int = 50
+    PIPELINE_TIMEOUT: int = 300
+    PIPELINE_MAX_WORKERS: int = 4
+    BACKGROUND_TASKS_ENABLED: bool = True
+
+    # ── Storage ──────────────────────────────────────────────────
+    REPOS_DIR: str = "repos"
+    DATA_DIR: str = "data"
+    REVIEW_DATA_DIR: str = "data/reviews"
+    LOG_DIR: str = "logs"
+
+    # ── Observability ────────────────────────────────────────────
+    TRACE_ENABLED: bool = True
+    LLM_TELEMETRY_ENABLED: bool = True
+    TRACE_LOG_LEVEL: str = "INFO"
+
+    # ── Evaluation ───────────────────────────────────────────────
+    EVALUATION_ENABLED: bool = True
+    GOLDEN_DATASET_PATH: str = "data/evaluation"
+    EVALUATION_OUTPUT_PATH: str = "data/evaluation/results"
+
+    # ── Security ─────────────────────────────────────────────────
+    API_AUTH_ENABLED: bool = False
 
     # ── Confidence Weights ───────────────────────────────────────
     CONFIDENCE_BASE_SCORE: float = 0.40
@@ -79,10 +157,41 @@ class Settings(BaseSettings):
     MAX_NESTING_DEPTH: int = 3
     REASONING_ACTIVATION_THRESHOLD: float = 0.50
 
+    @model_validator(mode="after")
+    def _validate_configuration(self) -> "Settings":
+        """Validate LLM and embedding configurations."""
+        # Align LLM_API_KEY with GEMINI_API_KEY if not explicitly set
+        if not self.GEMINI_API_KEY and self.LLM_API_KEY:
+            self.GEMINI_API_KEY = self.LLM_API_KEY
+        elif self.GEMINI_API_KEY and not self.LLM_API_KEY:
+            self.LLM_API_KEY = self.GEMINI_API_KEY
+
+        # Align GEMINI_LLM_MODEL with LLM_MODEL
+        if self.GEMINI_LLM_MODEL != self.LLM_MODEL:
+            if self.LLM_MODEL == "gemini-3.6-flash":
+                self.LLM_MODEL = self.GEMINI_LLM_MODEL
+            else:
+                self.GEMINI_LLM_MODEL = self.LLM_MODEL
+
+        # Align GEMINI_EMBEDDING_MODEL with EMBEDDING_MODEL
+        if self.GEMINI_EMBEDDING_MODEL != self.EMBEDDING_MODEL:
+            self.GEMINI_EMBEDDING_MODEL = self.EMBEDDING_MODEL
+
+        return self
+
+    def validate_gemini_credentials(self) -> None:
+        """Validate that Gemini API credentials exist when required at runtime."""
+        effective_key = self.GEMINI_API_KEY or self.LLM_API_KEY or os.environ.get("GEMINI_API_KEY")
+        if not effective_key or effective_key in ("your_gemini_api_key_here", "mock_key"):
+            raise ValueError(
+                "Gemini API key is required when Gemini LLM or embedding functionality is enabled."
+            )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
+        "extra": "ignore",
     }
 
 

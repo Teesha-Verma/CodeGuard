@@ -18,7 +18,7 @@ from app.analysis.RAG.integration.stages import (
 
 class RAGPipelineConfig(BaseModel):
     """Configuration for the RAG Pipeline."""
-    model_name: str = Field(default="llama-3.3-70b-versatile")
+    model_name: str = Field(default="gemini-3.6-flash")
     template_name: str = Field(default="mixed_review")
     output_format: str = Field(default="json")
     max_tokens: int = Field(default=16000)

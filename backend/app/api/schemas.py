@@ -144,6 +144,11 @@ class FileReport(BaseModel):
                 else:
                     self.meaningful_issues.append(issue)
 
+    @property
+    def issues(self) -> List[ReviewIssue]:
+        """Convenience property combining meaningful, style, and suppressed issues."""
+        return self.meaningful_issues + self.style_findings + self.suppressed_findings
+
     def model_dump(self, *args, **kwargs):
         json_keys = {
             "skipkeys", "ensure_ascii", "check_circular", "allow_nan", "cls",

@@ -5,7 +5,7 @@ Constants and configuration for the Knowledge & RAG Layer.
 from enum import Enum
 
 # Embedding
-DEFAULT_EMBEDDING_MODEL = "models/text-embedding-004"
+DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
 DEFAULT_EMBEDDING_DIMENSION = 768
 MAX_EMBEDDING_BATCH_SIZE = 100
 EMBEDDING_TASK_TYPE = "RETRIEVAL_DOCUMENT"
