@@ -205,6 +205,7 @@ class TestLLMReasoningLayer:
 
     def test_llm_client_mock_mode(self):
         client = LLMClient(review_id="test_rev_1")
+        client.provider = "mock"
         res = client.generate_structured(
             system_prompt="You are a root cause engine.",
             user_content='{"finding": {"issue": "SQL injection", "line": 42}}'

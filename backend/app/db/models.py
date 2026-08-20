@@ -20,7 +20,7 @@ class ReviewIssueModel(Base):
     __tablename__ = "review_issues"
     
     id = Column(String, primary_key=True, index=True)
-    review_id = Column(String, ForeignKey("reviews.id"))
+    review_id = Column(String, ForeignKey("reviews.id", ondelete="CASCADE"))
     file_path = Column(String, index=True)
     line_number = Column(Integer)
     severity = Column(String)
@@ -43,7 +43,7 @@ class PipelineTrace(Base):
     __tablename__ = "pipeline_traces"
     
     id = Column(String, primary_key=True, index=True)
-    review_id = Column(String, ForeignKey("reviews.id"))
+    review_id = Column(String, ForeignKey("reviews.id", ondelete="CASCADE"))
     stage = Column(String)
     duration_ms = Column(Float)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))

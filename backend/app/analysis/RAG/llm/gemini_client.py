@@ -106,22 +106,65 @@ class GeminiClient(BaseLLMClient):
         else:
             user_content = str(prompt)
 
+        if not system_instruction:
+            system_instruction = (
+                "You are an expert code reviewer. Analyze the code and output a JSON object adhering to this schema:\n"
+                "{\n"
+                '  "review_summary": "<summary of findings>",\n'
+                '  "overall_severity": "<low|medium|high|critical>",\n'
+                '  "findings": [\n'
+                '    {\n'
+                '      "title": "<finding title>",\n'
+                '      "severity": "<low|medium|high|critical>",\n'
+                '      "file_path": "<file path or snippet>",\n'
+                '      "line_number": 1,\n'
+                '      "evidence": "<code snippet evidence>",\n'
+                '      "reasoning": "<why this is an issue>",\n'
+                '      "priority": "<low|medium|high|critical>",\n'
+                '      "remediation": "<how to fix>",\n'
+                '      "code_suggestion": "<suggested code>",\n'
+                '      "references": []\n'
+                '    }\n'
+                '  ],\n'
+                '  "evidence_summary": "<summary of evidence>",\n'
+                '  "reasoning_trace": "<reasoning explanation>",\n'
+                '  "confidence": 0.95,\n'
+                '  "priority": "<low|medium|high|critical>",\n'
+                '  "remediation_summary": "<remediation overview>",\n'
+                '  "code_suggestions": [],\n'
+                '  "references": [],\n'
+                '  "review_metadata": {}\n'
+                "}"
+            )
+
         gen_config = None
         if types is not None:
             config_kwargs = {
                 "response_mime_type": "application/json",
+                "system_instruction": system_instruction,
             }
-            if system_instruction:
-                config_kwargs["system_instruction"] = system_instruction
             gen_config = types.GenerateContentConfig(**config_kwargs)
 
         def _call_gemini():
             client = self._get_client()
-            return client.models.generate_content(
-                model=model,
-                contents=user_content,
-                config=gen_config,
-            )
+            try:
+                return client.models.generate_content(
+                    model=model,
+                    contents=user_content,
+                    config=gen_config,
+                )
+            except Exception as e:
+                err_str = str(e).lower()
+                if "generaterequestsperday" in err_str:
+                    for fb in ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"]:
+                        if fb != model:
+                            logger.info(f"Switching to fallback model {fb} due to daily quota limit on {model}.")
+                            return client.models.generate_content(
+                                model=fb,
+                                contents=user_content,
+                                config=gen_config,
+                            )
+                raise
 
         response = self.retry_engine.execute_with_retry(
             _call_gemini,
@@ -142,6 +185,33 @@ class GeminiClient(BaseLLMClient):
         cleaned_content = cleaned_content.strip()
 
         parsed_json = json.loads(cleaned_content)
+        if not isinstance(parsed_json, dict):
+            parsed_json = {"review_summary": str(parsed_json)}
+
+        # Normalize required fields
+        if "review_summary" not in parsed_json:
+            parsed_json["review_summary"] = parsed_json.get("summary", parsed_json.get("description", "Code review completed."))
+        if "overall_severity" not in parsed_json:
+            parsed_json["overall_severity"] = parsed_json.get("severity", "medium")
+        if "findings" not in parsed_json:
+            raw_findings = parsed_json.get("issues", parsed_json.get("vulnerabilities", []))
+            if isinstance(raw_findings, list):
+                parsed_json["findings"] = raw_findings
+            elif "finding" in parsed_json and isinstance(parsed_json["finding"], dict):
+                parsed_json["findings"] = [parsed_json["finding"]]
+            else:
+                parsed_json["findings"] = []
+        if "evidence_summary" not in parsed_json:
+            parsed_json["evidence_summary"] = parsed_json.get("evidence", "")
+        if "reasoning_trace" not in parsed_json:
+            parsed_json["reasoning_trace"] = parsed_json.get("reasoning", "")
+        if "confidence" not in parsed_json:
+            parsed_json["confidence"] = 0.90
+        if "priority" not in parsed_json:
+            parsed_json["priority"] = parsed_json.get("severity", "medium")
+        if "remediation_summary" not in parsed_json:
+            parsed_json["remediation_summary"] = parsed_json.get("remediation", parsed_json.get("fix", ""))
+
         return ReviewResponse.model_validate(parsed_json)
 
     def generate_raw(self, prompt_text: str, system_instruction: str = "") -> str:

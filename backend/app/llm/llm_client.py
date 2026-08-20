@@ -72,11 +72,16 @@ class LLMClient:
         """
         self.logger.debug(f"Sending structured request to {self.provider} ({self.model})")
 
-        # Mock mode fallback for testing without real credentials
-        if self.provider in ("mock", "mock_gemini") or not self.api_key or self.api_key in ("mock_key", "your_gemini_api_key_here"):
+        # Mock mode fallback ONLY when explicitly configured
+        if self.provider in ("mock", "mock_gemini"):
             return self._generate_mock_structured(system_prompt, user_content)
 
-        max_retries = self.settings.GEMINI_MAX_RETRIES or self.settings.LLM_MAX_RETRIES or 3
+        if not self.api_key or self.api_key in ("mock_key", "your_gemini_api_key_here"):
+            if self.provider == "gemini":
+                raise ValueError("Gemini API key is required when LLM_PROVIDER is 'gemini'.")
+            return self._generate_mock_structured(system_prompt, user_content)
+
+        max_retries = max(self.settings.GEMINI_MAX_RETRIES or 3, 5)
         backoff_factor = 2.0
 
         gen_config = None
@@ -88,11 +93,12 @@ class LLMClient:
                 config_kwargs["system_instruction"] = system_prompt
             gen_config = types.GenerateContentConfig(**config_kwargs)
 
+        current_model = self.model
         for attempt in range(1, max_retries + 1):
             try:
                 client = self._get_client()
                 response = client.models.generate_content(
-                    model=self.model,
+                    model=current_model,
                     contents=user_content,
                     config=gen_config,
                 )
@@ -100,7 +106,46 @@ class LLMClient:
                 content = response.text if hasattr(response, "text") else str(response)
                 if content:
                     cleaned_content = self._clean_json_text(content)
-                    return json.loads(cleaned_content)
+                    parsed = json.loads(cleaned_content)
+                    if isinstance(parsed, dict):
+                        # Flatten if nested in 'issues' list
+                        if "issues" in parsed and isinstance(parsed["issues"], list) and len(parsed["issues"]) > 0:
+                            first_issue = parsed["issues"][0]
+                            if isinstance(first_issue, dict):
+                                for k, v in first_issue.items():
+                                    if k not in parsed:
+                                        parsed[k] = v
+
+                        # Field alias normalization
+                        if "remediation" in parsed and "fix" not in parsed:
+                            parsed["fix"] = parsed["remediation"]
+                        if "suggestion" in parsed and "fix" not in parsed:
+                            parsed["fix"] = parsed["suggestion"]
+                        if "solution" in parsed and "fix" not in parsed:
+                            parsed["fix"] = parsed["solution"]
+                        if "explanation" in parsed and "root_cause" not in parsed:
+                            parsed["root_cause"] = parsed["explanation"]
+                        if "cause" in parsed and "root_cause" not in parsed:
+                            parsed["root_cause"] = parsed["cause"]
+                        if "trigger" in parsed and "trigger_condition" not in parsed:
+                            parsed["trigger_condition"] = parsed["trigger"]
+                        if "condition" in parsed and "trigger_condition" not in parsed:
+                            parsed["trigger_condition"] = parsed["condition"]
+                        if "runtime_condition" in parsed and "trigger_condition" not in parsed:
+                            parsed["trigger_condition"] = parsed["runtime_condition"]
+                        if "type" in parsed and "issue_type" not in parsed:
+                            parsed["issue_type"] = parsed["type"]
+                        if "category" in parsed and "issue_type" not in parsed:
+                            parsed["issue_type"] = parsed["category"]
+                        if "classification" in parsed and "issue_type" not in parsed:
+                            parsed["issue_type"] = parsed["classification"]
+
+                        # Defaults for schema safety
+                        if "trigger_condition" not in parsed:
+                            parsed["trigger_condition"] = parsed.get("root_cause", "Runtime execution with untrusted inputs")
+                        if "issue_type" not in parsed:
+                            parsed["issue_type"] = "security"
+                    return parsed
 
                 self.logger.warning(f"Empty content returned from {self.provider}")
                 return None
@@ -111,14 +156,28 @@ class LLMClient:
                     return None
             except Exception as e:
                 err_str = str(e).lower()
-                is_transient = any(code in err_str for code in ["429", "500", "502", "503", "504", "timeout", "connection", "rate limit", "resource_exhausted"])
-                self.logger.warning(f"Gemini API Error on attempt {attempt}/{max_retries}: {e}")
+                is_transient = any(code in err_str for code in ["429", "500", "502", "503", "504", "timeout", "connection", "rate limit", "resource_exhausted", "quota"])
+                self.logger.warning(f"Gemini API Error on attempt {attempt}/{max_retries} with model {current_model}: {e}")
+
+                # If daily quota for model is exhausted, fallback through available models
+                fallback_candidates = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"]
+                if "generaterequestsperday" in err_str:
+                    next_model = next((m for m in fallback_candidates if m != current_model), None)
+                    if next_model:
+                        self.logger.info(f"Switching to fallback model {next_model} due to daily quota limit on {current_model}.")
+                        current_model = next_model
+                        continue
+
                 if not is_transient or attempt == max_retries:
                     self.logger.error(f"Non-transient or final API Error: {e}")
                     return None
 
-            sleep_time = backoff_factor ** attempt
-            time.sleep(sleep_time)
+                is_quota = "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str
+                if is_quota:
+                    sleep_time = max(15.0, 5.0 * (1.5 ** attempt))
+                else:
+                    sleep_time = backoff_factor ** attempt
+                time.sleep(sleep_time)
 
         return None
 

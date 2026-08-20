@@ -74,17 +74,23 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
     def embed_text(self, text: str) -> list[float]:
         """Generate embedding for a single document text."""
-        return self._embed_with_retry([text], task_type="RETRIEVAL_DOCUMENT")[0]
+        return self._embed_single(text, task_type="RETRIEVAL_DOCUMENT")
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for a batch of texts."""
         if not texts:
             return []
-        return self._embed_with_retry(texts, task_type="RETRIEVAL_DOCUMENT")
+        all_embeddings: list[list[float]] = []
+        for i, text in enumerate(texts):
+            emb = self._embed_single(text, task_type="RETRIEVAL_DOCUMENT")
+            all_embeddings.append(emb)
+            if i + 1 < len(texts):
+                time.sleep(0.05)  # Gentle pacing between embedding calls
+        return all_embeddings
 
     def embed_query(self, query: str) -> list[float]:
         """Generate embedding for a search query."""
-        return self._embed_with_retry([query], task_type="RETRIEVAL_QUERY")[0]
+        return self._embed_single(query, task_type="RETRIEVAL_QUERY")
 
     @property
     def dimension(self) -> int:
@@ -94,8 +100,8 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     def model_name(self) -> str:
         return self._model
 
-    def _embed_with_retry(self, texts: list[str], task_type: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
-        """Call GenAI embed_content API with retries and exponential backoff."""
+    def _embed_single(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float]:
+        """Call GenAI embed_content API with retries and exponential backoff for a single text."""
         client = self._get_client()
         last_error = None
 
@@ -106,38 +112,52 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
                 output_dimensionality=self._dimension if self._dimension else None,
             )
 
-        for attempt in range(self._max_retries + 1):
+        current_model = self._model
+        max_retries = max(self._max_retries, 5)
+        for attempt in range(max_retries + 1):
             try:
                 response = client.models.embed_content(
-                    model=self._model,
-                    contents=texts if len(texts) > 1 else texts[0],
+                    model=current_model,
+                    contents=text,
                     config=config,
                 )
 
-                # Extract embedding vectors
+                # Extract embedding vector
                 if hasattr(response, "embeddings") and response.embeddings:
-                    embeddings = []
-                    for emb in response.embeddings:
-                        if hasattr(emb, "values"):
-                            embeddings.append(list(emb.values))
-                        elif isinstance(emb, list):
-                            embeddings.append(emb)
-                    return embeddings
+                    first = response.embeddings[0]
+                    if hasattr(first, "values"):
+                        return list(first.values)
+                    elif isinstance(first, list):
+                        return list(first)
                 elif hasattr(response, "embedding") and response.embedding:
                     if hasattr(response.embedding, "values"):
-                        return [list(response.embedding.values)]
-                    return [response.embedding]
+                        return list(response.embedding.values)
+                    return list(response.embedding)
 
                 raise ValueError("Unexpected response format from Gemini embedding API")
 
             except Exception as e:
                 last_error = e
-                if attempt == self._max_retries:
-                    logger.error(f"Failed to generate Gemini embeddings after {self._max_retries} retries: {e}")
+                err_str = str(e).lower()
+                is_quota = "429" in err_str or "resource_exhausted" in err_str or "quota" in err_str
+
+                # If daily quota for primary embedding model is reached, fallback to gemini-embedding-001
+                if "embedcontentrequestsperday" in err_str and current_model != "gemini-embedding-001":
+                    logger.info("Switching to fallback model gemini-embedding-001 due to daily quota limit on primary model.")
+                    current_model = "gemini-embedding-001"
+                    continue
+
+                if attempt == max_retries:
+                    logger.error(f"Failed to generate Gemini embedding after {max_retries} retries: {e}")
                     raise
 
-                delay = self._retry_delay * (2 ** attempt)
-                logger.warning(f"Embedding attempt {attempt + 1} failed, retrying in {delay}s: {e}")
+                # Longer backoff for quota / rate limits
+                if is_quota:
+                    delay = max(10.0, 5.0 * (1.5 ** attempt))
+                else:
+                    delay = self._retry_delay * (2 ** attempt)
+
+                logger.warning(f"Embedding attempt {attempt + 1} failed, retrying in {delay:.1f}s: {e}")
                 time.sleep(delay)
 
         raise RuntimeError(f"Embedding failed: {last_error}")

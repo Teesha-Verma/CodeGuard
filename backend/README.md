@@ -82,15 +82,25 @@ cp .env.example .env
 | `LOG_LEVEL` | `INFO` | Root logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `ENVIRONMENT` | `development` | Deployment environment |
 
-#### Database (PostgreSQL)
+#### Database (PostgreSQL / Supabase)
 | Variable | Default | Description |
 |---|---|---|
-| `POSTGRES_HOST` | `localhost` | PostgreSQL host |
+| `POSTGRES_HOST` | `localhost` | PostgreSQL host (local dev fallback) |
 | `POSTGRES_PORT` | `5432` | PostgreSQL port |
 | `POSTGRES_DB` | `codeguard` | Database name |
 | `POSTGRES_USER` | `codeguard` | Database username |
 | `POSTGRES_PASSWORD` | `your_postgres_password_here` | Database password placeholder |
-| `DATABASE_URL` | *(Auto-constructed)* | Full SQLAlchemy database connection string |
+| `DATABASE_URL` | *(Auto-constructed)* | Full SQLAlchemy connection string (Supabase Session Pooler on port 5432) |
+| `ALEMBIC_DATABASE_URL` | `None` | Optional separate migration connection URI (falls back to `DATABASE_URL`) |
+| `DB_POOL_SIZE` | `5` | SQLAlchemy connection pool size |
+| `DB_MAX_OVERFLOW` | `5` | Maximum overflow connections beyond pool size |
+| `DB_POOL_TIMEOUT` | `30` | Connection checkout timeout in seconds |
+| `DB_POOL_RECYCLE` | `1800` | Connection recycle period in seconds (prevents stale pooler connections) |
+
+> [!IMPORTANT]
+> - **Hosted Provider**: Supabase is used as the hosted PostgreSQL provider.
+> - **Session Pooler (port 5432)**: The Session Pooler URI is used for IPv4 compatibility and full session/prepared-statement support.
+> - **Credentials**: `DATABASE_URL` must always be supplied via environment variables or `.env`. Never commit credentials to version control.
 
 #### Google Gemini
 | Variable | Default | Description |
@@ -142,9 +152,9 @@ cp .env.example .env
    pip install -r requirements.txt
    ```
 
-3. **Start PostgreSQL**:
+3. **Database Migrations (Alembic)**:
    ```bash
-   docker compose up -d
+   alembic upgrade head
    ```
 
 4. **Run Application**:

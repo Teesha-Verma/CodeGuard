@@ -39,7 +39,7 @@ class KnowledgeRetrievalService:
         config: Optional[RAGConfig] = None,
         embedding_provider: Optional[EmbeddingProvider] = None,
         vector_store: Optional[InMemoryVectorStore] = None,
-        auto_index: bool = True,
+        auto_index: bool = False,
     ):
         self.settings = get_settings()
         self.config = config or RAGConfig.from_env()
@@ -52,12 +52,10 @@ class KnowledgeRetrievalService:
         # Configure embedding provider
         if embedding_provider is not None:
             self.embedding_provider = embedding_provider
-        elif (
-            self.settings.LLM_PROVIDER in ("mock", "mock_gemini")
-            or not self.settings.GEMINI_API_KEY
-            or self.settings.GEMINI_API_KEY in ("mock_key", "your_gemini_api_key_here")
-        ):
+        elif self.settings.EMBEDDING_PROVIDER in ("mock", "mock_gemini") or self.settings.RAG_EMBEDDING_PROVIDER in ("mock", "mock_gemini"):
             self.embedding_provider = MockEmbeddingProvider(dimension=self.config.embedding.dimension or 768)
+        elif not self.settings.GEMINI_API_KEY or self.settings.GEMINI_API_KEY in ("mock_key", "your_gemini_api_key_here"):
+            raise ValueError("Gemini API key is required when EMBEDDING_PROVIDER is 'gemini'.")
         else:
             self.embedding_provider = GeminiEmbeddingProvider(
                 api_key=self.settings.GEMINI_API_KEY,
@@ -78,15 +76,15 @@ class KnowledgeRetrievalService:
         if auto_index and self.vector_store.count() == 0:
             self.index_knowledge_base()
 
-    def index_knowledge_base(self, force_reindex: bool = False) -> int:
-        """Indexes all markdown knowledge documents into the vector store."""
+    def index_knowledge_base(self, force_reindex: bool = False, max_files: Optional[int] = 15) -> int:
+        """Indexes markdown knowledge documents into the vector store."""
         try:
             pipeline = IndexingPipeline(
                 config=self.config,
                 embedding_provider=self.embedding_provider,
                 vector_store=self.vector_store,
             )
-            stats = pipeline.run(force_reindex=force_reindex)
+            stats = pipeline.run(force_reindex=force_reindex, max_files=max_files if not force_reindex else None)
             self._is_indexed = True
             logger.info(f"RAG Knowledge Indexing complete: {stats.vectors_stored} vectors stored from {stats.files_parsed} files.")
             return stats.vectors_stored

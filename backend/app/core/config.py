@@ -31,21 +31,52 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "codeguard"
     POSTGRES_PASSWORD: str = "codeguard"
     DATABASE_URL: Optional[str] = None
+    ALEMBIC_DATABASE_URL: Optional[str] = None
+
+    # ── Database Connection Pooling ─────────────────────────────
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
 
     @model_validator(mode="after")
     def _assemble_database_url(self) -> "Settings":
-        """Auto-construct DATABASE_URL from POSTGRES_* components if not set."""
-        if not self.DATABASE_URL:
+        """Auto-construct or normalize DATABASE_URL and ALEMBIC_DATABASE_URL."""
+        if self.DATABASE_URL:
+            # Normalize legacy postgres:// to postgresql:// for SQLAlchemy 2.0 compatibility
+            if self.DATABASE_URL.startswith("postgres://"):
+                self.DATABASE_URL = "postgresql://" + self.DATABASE_URL[len("postgres://"):]
+        else:
             self.DATABASE_URL = (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
                 f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
             )
+
+        if self.ALEMBIC_DATABASE_URL and self.ALEMBIC_DATABASE_URL.startswith("postgres://"):
+            self.ALEMBIC_DATABASE_URL = "postgresql://" + self.ALEMBIC_DATABASE_URL[len("postgres://"):]
+
         return self
+
+    @property
+    def effective_alembic_url(self) -> str:
+        """Return ALEMBIC_DATABASE_URL if set, otherwise fall back to DATABASE_URL."""
+        return self.ALEMBIC_DATABASE_URL or self.DATABASE_URL or ""
+
+    def get_masked_database_url(self, url: Optional[str] = None) -> str:
+        """Return a sanitized database URL with password masked for safe logging."""
+        import re
+        target = url or self.DATABASE_URL
+        if not target:
+            return ""
+        return re.sub(r":([^:@/]+)@", r":***@", target)
 
     # ── GitHub ───────────────────────────────────────────────────
     GITHUB_TOKEN: Optional[str] = None
     GITHUB_API_URL: str = "https://api.github.com"
     GITHUB_TIMEOUT: int = 30
+    E2E_GITHUB_OWNER: Optional[str] = None
+    E2E_GITHUB_REPO: Optional[str] = None
+    E2E_GITHUB_PR_NUMBER: Optional[int] = None
 
     # ── Gemini ───────────────────────────────────────────────────
     GEMINI_API_KEY: str = ""
