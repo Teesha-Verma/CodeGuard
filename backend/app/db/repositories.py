@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from app.db.models import Review, ReviewIssueModel, PipelineTrace
 import uuid
-from typing import Optional
+from typing import Optional, Any, List, Dict
 
 class ReviewRepository:
     """Repository pattern for database operations related to code reviews."""
@@ -30,59 +30,79 @@ class ReviewRepository:
                 self.db.rollback()
                 raise
             
-    def save_issue(self, review_id: str, file_path: str, issue_data: dict):
+    def save_issue(self, review_id: str, file_path: str, issue_data: Any) -> ReviewIssueModel:
         issue_id = str(uuid.uuid4())
-        
+
+        if hasattr(issue_data, "model_dump"):
+            data = issue_data.model_dump()
+        elif hasattr(issue_data, "dict"):
+            data = issue_data.dict()
+        elif isinstance(issue_data, dict):
+            data = issue_data
+        else:
+            data = vars(issue_data)
+
         # Preserve new fields inside evidence column for complete database backward compatibility
-        evidence = issue_data.get("evidence", {}) or {}
-        evidence["signal_priority"] = issue_data.get("signal_priority", "medium")
-        evidence["issue_category"] = issue_data.get("issue_category", "runtime logic risks")
-        evidence["is_low_signal"] = issue_data.get("is_low_signal", False)
-        evidence["detection_source"] = issue_data.get("detection_source", "ast")
-        evidence["reasoning_source"] = issue_data.get("reasoning_source", "static_analysis")
-        evidence["priority_score"] = issue_data.get("priority_score", 0.50)
-        evidence["detection_sources"] = issue_data.get("detection_sources", [])
+        evidence = data.get("evidence", {}) or {}
+        if not isinstance(evidence, dict):
+            evidence = {}
+        evidence["signal_priority"] = data.get("signal_priority", "medium")
+        evidence["issue_category"] = data.get("issue_category", "runtime logic risks")
+        evidence["is_low_signal"] = data.get("is_low_signal", False)
+        evidence["detection_source"] = data.get("detection_source", "ast")
+        evidence["reasoning_source"] = data.get("reasoning_source", "static_analysis")
+        evidence["priority_score"] = data.get("priority_score", 0.50)
+        evidence["detection_sources"] = data.get("detection_sources", [])
 
         issue = ReviewIssueModel(
             id=issue_id,
             review_id=review_id,
             file_path=file_path,
-            line_number=issue_data.get("line"),
-            severity=issue_data.get("severity"),
-            confidence=issue_data.get("confidence"),
-            issue_description=issue_data.get("issue"),
-            root_cause=issue_data.get("root_cause"),
-            trigger_condition=issue_data.get("trigger_condition"),
-            fix_suggestion=issue_data.get("fix"),
-            patch=issue_data.get("patch"),
-            issue_type=issue_data.get("issue_type"),
-            sources=issue_data.get("sources"),
-            reasoning_trace=issue_data.get("reasoning_trace"),
+            line_number=data.get("line"),
+            severity=data.get("severity"),
+            confidence=data.get("confidence"),
+            issue_description=data.get("issue"),
+            root_cause=data.get("root_cause"),
+            trigger_condition=data.get("trigger_condition"),
+            fix_suggestion=data.get("fix"),
+            patch=data.get("patch"),
+            issue_type=data.get("issue_type"),
+            sources=data.get("sources"),
+            reasoning_trace=data.get("reasoning_trace"),
             evidence=evidence
         )
         try:
             self.db.add(issue)
             self.db.commit()
+            self.db.refresh(issue)
         except Exception:
             self.db.rollback()
             raise
+        return issue
 
     def get_review(self, review_id: str) -> Optional[Review]:
         return self.db.query(Review).filter(Review.id == review_id).first()
 
-    def save_trace(self, review_id: str, stage: str, duration_ms: float, input_data: dict, output_data: dict) -> PipelineTrace:
+    def get_issues(self, review_id: str) -> list[ReviewIssueModel]:
+        return self.db.query(ReviewIssueModel).filter(ReviewIssueModel.review_id == review_id).all()
+
+    def get_traces(self, review_id: str) -> list[PipelineTrace]:
+        return self.db.query(PipelineTrace).filter(PipelineTrace.review_id == review_id).all()
+
+    def save_trace(self, review_id: str, stage: str, duration_ms: float, input_data: Any, output_data: Any) -> PipelineTrace:
         trace_id = str(uuid.uuid4())
         trace = PipelineTrace(
             id=trace_id,
             review_id=review_id,
             stage=stage,
             duration_ms=duration_ms,
-            input_data=input_data,
-            output_data=output_data
+            input_data=input_data if isinstance(input_data, dict) else {},
+            output_data=output_data if isinstance(output_data, dict) else {}
         )
         try:
             self.db.add(trace)
             self.db.commit()
+            self.db.refresh(trace)
         except Exception:
             self.db.rollback()
             raise

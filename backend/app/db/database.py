@@ -9,16 +9,17 @@ _SessionLocal = None
 
 
 def _get_engine():
-    """Lazily create and cache the SQLAlchemy engine."""
+    """Lazily create and cache the SQLAlchemy engine with configurable pooling."""
     global _engine
     if _engine is None:
         settings = get_settings()
         _engine = create_engine(
             settings.DATABASE_URL,
             pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=10,
-            pool_recycle=1800,
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            pool_timeout=settings.DB_POOL_TIMEOUT,
+            pool_recycle=settings.DB_POOL_RECYCLE,
         )
     return _engine
 
@@ -33,6 +34,18 @@ def _get_session_factory():
     return _SessionLocal
 
 
+def _reset_engine_cache():
+    """Reset cached engine and session factory (useful for testing)."""
+    global _engine, _SessionLocal
+    if _engine is not None:
+        try:
+            _engine.dispose()
+        except Exception:
+            pass
+    _engine = None
+    _SessionLocal = None
+
+
 # Public accessors — maintain backward compatibility
 engine = property(lambda self: _get_engine())
 
@@ -43,7 +56,8 @@ class _EngineProxy:
         return getattr(_get_engine(), name)
 
     def __repr__(self):
-        return repr(_get_engine())
+        settings = get_settings()
+        return f"<Engine({settings.get_masked_database_url()})>"
 
 
 engine = _EngineProxy()

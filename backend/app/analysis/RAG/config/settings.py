@@ -27,10 +27,10 @@ class ChunkingConfig:
 @dataclass
 class EmbeddingConfig:
     """Embedding provider configuration."""
-    provider: str = "mock"  # mock | gemini | openai
-    model: str = "models/text-embedding-004"
+    provider: str = "gemini"  # gemini | mock | openai
+    model: str = "gemini-embedding-2"
     dimension: int = 768
-    batch_size: int = 64
+    batch_size: int = 32
     max_retries: int = 3
     retry_delay: float = 1.0
     cache_enabled: bool = True
@@ -61,13 +61,28 @@ class RAGConfig:
     def from_env(cls) -> RAGConfig:
         """Build config from environment variables."""
         config = cls()
-        config.knowledge_dir = os.environ.get("RAG_KNOWLEDGE_DIR", config.knowledge_dir)
-        config.embedding.provider = os.environ.get("RAG_EMBEDDING_PROVIDER", config.embedding.provider)
-        config.embedding.model = os.environ.get("RAG_EMBEDDING_MODEL", config.embedding.model)
-        config.vector_store.provider = os.environ.get("RAG_VECTOR_STORE_PROVIDER", config.vector_store.provider)
+        config.knowledge_dir = os.environ.get(
+            "RAG_KNOWLEDGE_PATH",
+            os.environ.get("RAG_KNOWLEDGE_DIR", config.knowledge_dir),
+        )
+        config.embedding.provider = os.environ.get(
+            "RAG_EMBEDDING_PROVIDER",
+            os.environ.get("EMBEDDING_PROVIDER", config.embedding.provider),
+        )
+        config.embedding.model = os.environ.get(
+            "RAG_EMBEDDING_MODEL",
+            os.environ.get("GEMINI_EMBEDDING_MODEL", os.environ.get("EMBEDDING_MODEL", config.embedding.model)),
+        )
+        config.vector_store.provider = os.environ.get(
+            "RAG_VECTOR_STORE",
+            os.environ.get("RAG_VECTOR_STORE_PROVIDER", config.vector_store.provider),
+        )
         config.log_level = os.environ.get("RAG_LOG_LEVEL", config.log_level)
-        dim = os.environ.get("RAG_EMBEDDING_DIMENSION")
+        dim = os.environ.get("EMBEDDING_DIMENSION") or os.environ.get("RAG_EMBEDDING_DIMENSION")
         if dim:
             config.embedding.dimension = int(dim)
             config.vector_store.dimension = int(dim)
+        batch = os.environ.get("EMBEDDING_BATCH_SIZE")
+        if batch:
+            config.embedding.batch_size = int(batch)
         return config

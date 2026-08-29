@@ -1,0 +1,60 @@
+# ============================================================
+# CodeGuard V2 — Backend .dockerignore
+# ============================================================
+
+# Version Control
+.git/
+.gitignore
+
+# Environment & Secrets
+.env
+.env.*
+*.env
+!.env.example
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# Local Data & Repos
+*.db
+*.sqlite
+*.sqlite3
+data/
+repos/
+logs/
+*.log
+*.trace
+
+# RAG Vector & Embedding Caches
+vector_store/
+embeddings_cache/
+rag_cache/
+*.faiss
+*.index
+
+# Temporary & OS Files
+tmp/
+temp/
+*.tmp
+.DS_Store
+Thumbs.db

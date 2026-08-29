@@ -8,7 +8,7 @@ Supports incremental indexing via content hash comparison.
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, Optional
 
 from app.analysis.RAG.config.settings import RAGConfig
 from app.analysis.RAG.embeddings.base import EmbeddingProvider
@@ -42,6 +42,7 @@ class IndexingPipeline:
     def run(
         self,
         force_reindex: bool = False,
+        max_files: Optional[int] = None,
     ) -> PipelineStats:
         """Execute the full indexing pipeline."""
         stats = PipelineStats()
@@ -53,6 +54,8 @@ class IndexingPipeline:
                 self._config.knowledge_dir,
                 self._config.supported_extensions,
             )
+            if max_files and len(file_paths) > max_files:
+                file_paths = file_paths[:max_files]
             stats.files_discovered = len(file_paths)
 
             # 2. Parse

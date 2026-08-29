@@ -22,4 +22,4 @@ class ReviewStore:
             return None
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return ReviewReport.parse_obj(data)
+            return ReviewReport.model_validate(data)
