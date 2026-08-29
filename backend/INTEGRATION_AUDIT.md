@@ -149,6 +149,6 @@ A comprehensive, end-to-end integration audit was performed on the CodeGuard V2 
 
 ## 5. Deployment Environment Compliance
 
-1. **AI Providers**: Exclusively Google Gemini (`gemini-3.6-flash` and `gemini-embedding-2`). All legacy provider references and deprecated sampling parameters (`temperature`, `top_p`, `top_k`) removed.
+1. **AI Providers**: Exclusively Google Gemini (`gemini-2.5-flash` and `gemini-embedding-2`). All legacy provider references and deprecated sampling parameters (`temperature`, `top_p`, `top_k`) removed.
 2. **Secrets & Credentials**: Fully abstracted into `.env` and `.env.example`. Zero exposed or hardcoded keys. Telemetry engine sanitizes all key patterns (`AIza...`, GitHub tokens, DB passwords).
 3. **Database Resiliency**: PostgreSQL repository persistence operates seamlessly when live; automatically logs and falls back to atomic JSON disk storage if PostgreSQL is unavailable.

@@ -37,7 +37,7 @@ FastAPI Response
 
 ## Technology Stack
 
-- **Reasoning LLM**: Google Gemini 3.6 Flash (`gemini-3.6-flash`) via `google-genai` SDK
+- **Reasoning LLM**: Google Gemini 2.5 Flash (`gemini-2.5-flash`) via `google-genai` SDK
 - **Embedding Provider**: Google Gemini Embedding 2 (`gemini-embedding-2`, 768 dimensions)
 - **Framework**: FastAPI, Uvicorn, Pydantic v2
 - **Database**: PostgreSQL with SQLAlchemy 2.0

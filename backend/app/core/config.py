@@ -80,19 +80,33 @@ class Settings(BaseSettings):
 
     # ── Gemini ───────────────────────────────────────────────────
     GEMINI_API_KEY: str = ""
-    GEMINI_LLM_MODEL: str = "gemini-3.6-flash"
+    GEMINI_PRIMARY_MODEL: str = "gemini-2.5-flash"
+    GEMINI_LLM_MODEL: str = "gemini-2.5-flash"
+    GEMINI_FALLBACK_MODELS: str = "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com"
     GEMINI_TIMEOUT: int = 60
-    GEMINI_MAX_RETRIES: int = 3
+    GEMINI_MAX_RETRIES: int = 2
 
     # ── LLM ──────────────────────────────────────────────────────
     LLM_PROVIDER: str = "gemini"  # "gemini" | "mock" | "openai"
-    LLM_MODEL: str = "gemini-3.6-flash"
+    LLM_MODEL: str = "gemini-2.5-flash"
     LLM_API_KEY: str = ""
     LLM_MAX_TOKENS: int = 4096
     LLM_TIMEOUT: int = 60
-    LLM_MAX_RETRIES: int = 3
+    LLM_MAX_RETRIES: int = 2
+    LLM_MAX_GENERATION_REQUESTS_PER_REVIEW: int = 10
+    LLM_BACKOFF_BASE_SECONDS: float = 1.5
+    LLM_CACHE_ENABLED: bool = True
+    LLM_CACHE_TTL: int = 3600
+    GEMINI_REAL_TEST: bool = False
+
+    @property
+    def gemini_fallback_model_list(self) -> list[str]:
+        """Return parsed list of Gemini fallback models."""
+        if isinstance(self.GEMINI_FALLBACK_MODELS, str):
+            return [m.strip() for m in self.GEMINI_FALLBACK_MODELS.split(",") if m.strip()]
+        return list(self.GEMINI_FALLBACK_MODELS)
 
     # ── RAG ──────────────────────────────────────────────────────
     RAG_ENABLED: bool = True
@@ -147,9 +161,14 @@ class Settings(BaseSettings):
     PYLINT_ENABLED: bool = True
     FLAKE8_ENABLED: bool = True
     BANDIT_ENABLED: bool = True
+    LINTER_TIMEOUT: int = 15
+    REPOSITORY_ANALYSIS_TIMEOUT: int = 30
 
     # ── Pipeline ─────────────────────────────────────────────────
     PIPELINE_TIMEOUT: int = 300
+    MAX_REVIEW_DURATION_SECONDS: int = 300
+    GIT_TIMEOUT: int = 60
+    LLM_STAGE_TIMEOUT: int = 60
     PIPELINE_MAX_WORKERS: int = 4
     BACKGROUND_TASKS_ENABLED: bool = True
 
@@ -199,7 +218,7 @@ class Settings(BaseSettings):
 
         # Align GEMINI_LLM_MODEL with LLM_MODEL
         if self.GEMINI_LLM_MODEL != self.LLM_MODEL:
-            if self.LLM_MODEL == "gemini-3.6-flash":
+            if self.LLM_MODEL == "gemini-2.5-flash":
                 self.LLM_MODEL = self.GEMINI_LLM_MODEL
             else:
                 self.GEMINI_LLM_MODEL = self.LLM_MODEL

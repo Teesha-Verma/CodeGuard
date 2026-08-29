@@ -224,8 +224,8 @@ class TestEndToEndPipelineWiring:
         vector = embedder.embed_query("SQL Injection protection")
         assert len(vector) == 768
 
-        # 2. Test Gemini 3.6 Flash
-        llm = GeminiClient(api_key=api_key, model="gemini-3.6-flash")
+        # 2. Test Gemini 2.5 Flash
+        llm = GeminiClient(api_key=api_key, model="gemini-2.5-flash")
         review = llm.generate_review(prompt="Review this code snippet: cursor.execute(f'SELECT * FROM users WHERE id={user_id}')")
         assert review is not None
         assert review.review_summary != ""

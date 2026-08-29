@@ -149,9 +149,18 @@ class KnowledgeRetrievalService:
         )
         signals.append(signal)
 
-        retrieval_query = self.query_builder.build_query(signals)
-        results = self.retrieval_engine.retrieve(retrieval_query, top_k=top_k)
-        return self.assembler.assemble_context(results)
+        try:
+            retrieval_query = self.query_builder.build_query(signals)
+            results = self.retrieval_engine.retrieve(retrieval_query, top_k=top_k)
+            return self.assembler.assemble_context(results)
+        except Exception as e:
+            logger.warning(f"RAG retrieval failed for finding: {e}. Falling back to empty context.")
+            return AssembledContext(
+                formatted_prompt_context="",
+                retrieved_results=[],
+                total_documents=0,
+                sources=[]
+            )
 
     @classmethod
     def get_instance(cls) -> KnowledgeRetrievalService:

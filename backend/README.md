@@ -42,7 +42,7 @@ FastAPI Client Response
 
 ### Key Architectural Components
 
-- **Google Gemini 3.6 Flash (`gemini-3.6-flash`)**:
+- **Google Gemini 2.5 Flash (`gemini-2.5-flash`)**:
   Primary reasoning LLM used for evidence-based review synthesis, root cause analysis, and actionable remediation patch generation. Requests enforce deterministic structured JSON outputs and omit deprecated sampling parameters (`temperature`, `top_p`, `top_k`).
 - **Google Gemini Embedding 2 (`gemini-embedding-2`)**:
   High-dimensional (768-dim) semantic embedding model powering the RAG knowledge ingestion and query retrieval pipeline.
@@ -56,7 +56,7 @@ FastAPI Client Response
 ## 2. Technology Stack
 
 - **Framework**: FastAPI, Uvicorn, Pydantic v2, Pydantic-Settings
-- **LLM & Embeddings**: Google GenAI Python SDK (`google-genai`), Google Gemini 3.6 Flash, Gemini Embedding 2
+- **LLM & Embeddings**: Google GenAI Python SDK (`google-genai`), Google Gemini 2.5 Flash, Gemini Embedding 2
 - **Database & ORM**: PostgreSQL, SQLAlchemy 2.0, Alembic, psycopg2-binary
 - **Static Analysis**: Python `ast`, Tree-sitter (`tree-sitter-python`), Radon, Pylint, Flake8, Bandit
 - **Testing & Tooling**: Pytest, Pytest-Asyncio, HTTPX
@@ -106,7 +106,9 @@ cp .env.example .env
 | Variable | Default | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | `your_gemini_api_key_here` | Google Gemini API Key |
-| `GEMINI_LLM_MODEL` | `gemini-3.6-flash` | Gemini model for code review reasoning |
+| `GEMINI_PRIMARY_MODEL` | `gemini-2.5-flash` | Primary Gemini model for code review reasoning |
+| `GEMINI_LLM_MODEL` | `gemini-2.5-flash` | Gemini model for code review reasoning |
+| `GEMINI_FALLBACK_MODELS` | `gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash` | Fallback models list |
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-2` | Gemini model for RAG knowledge embeddings |
 | `GEMINI_API_BASE_URL` | `https://generativelanguage.googleapis.com` | Gemini API endpoint |
 | `GEMINI_TIMEOUT` | `60` | Request timeout in seconds |
@@ -116,7 +118,7 @@ cp .env.example .env
 | Variable | Default | Description |
 |---|---|---|
 | `LLM_PROVIDER` | `gemini` | Active LLM provider (`gemini` or `mock`) |
-| `LLM_MODEL` | `gemini-3.6-flash` | Reasoning model identifier |
+| `LLM_MODEL` | `gemini-2.5-flash` | Reasoning model identifier |
 | `LLM_MAX_TOKENS` | `4096` | Maximum generation tokens |
 | `LLM_TIMEOUT` | `60` | LLM invocation timeout |
 | `LLM_MAX_RETRIES` | `3` | Maximum retry attempts |

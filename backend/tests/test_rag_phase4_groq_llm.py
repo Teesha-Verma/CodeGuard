@@ -49,10 +49,10 @@ class TestReviewSchemaAndConfig:
 
     def test_gemini_config_defaults_and_env(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "test_gemini_key_123")
-        monkeypatch.setenv("GEMINI_LLM_MODEL", "gemini-3.6-flash")
+        monkeypatch.setenv("GEMINI_LLM_MODEL", "gemini-2.5-flash")
         config = LLMConfig.from_env()
         assert config.api_key == "test_gemini_key_123"
-        assert config.model == "gemini-3.6-flash"
+        assert config.model == "gemini-2.5-flash"
         assert config.json_mode is True
 
 
@@ -122,13 +122,13 @@ class TestMockAndGeminiLLMClient:
         assert len(review.findings) > 0
 
     def test_gemini_client_initialization(self):
-        config = GeminiConfig(api_key="mock_key", model="gemini-3.6-flash")
+        config = GeminiConfig(api_key="mock_key", model="gemini-2.5-flash")
         client = GeminiClient(config=config)
         assert client.provider_name == "gemini"
-        assert client.config.model == "gemini-3.6-flash"
+        assert client.config.model == "gemini-2.5-flash"
 
     def test_gemini_client_generate_review_with_mocked_genai(self):
-        config = GeminiConfig(api_key="test_api_key", model="gemini-3.6-flash")
+        config = GeminiConfig(api_key="test_api_key", model="gemini-2.5-flash")
         client = GeminiClient(config=config)
 
         mock_response = MagicMock()
@@ -167,7 +167,7 @@ class TestTelemetryAndResponseCache:
             latency_ms=320.0,
             request_size_bytes=600,
             response_size_bytes=200,
-            model_name="gemini-3.6-flash",
+            model_name="gemini-2.5-flash",
             success=True,
             retry_count=0,
         )
@@ -195,9 +195,9 @@ class TestTelemetryAndResponseCache:
             references=[],
             review_metadata={},
         )
-        cache.put(prompt_text="Analyze test code", model_name="gemini-3.6-flash", response=review)
+        cache.put(prompt_text="Analyze test code", model_name="gemini-2.5-flash", response=review)
 
-        cached = cache.get(prompt_text="Analyze test code", model_name="gemini-3.6-flash")
+        cached = cache.get(prompt_text="Analyze test code", model_name="gemini-2.5-flash")
         assert cached is not None
         assert cached.review_summary == "Cached review summary"
         assert cache.stats["hits"] == 1

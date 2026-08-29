@@ -5,7 +5,7 @@ Handles authenticated GitHub API interactions:
 - PR metadata retrieval
 - Unified diff fetching
 - Changed files analysis
-- Authenticated repository cloning and checkout
+- Authenticated repository cloning and checkout with timeouts
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ class GitHubClient:
         self.token = token if token is not None else settings.GITHUB_TOKEN
         self.api_url = (api_url or settings.GITHUB_API_URL or "https://api.github.com").rstrip("/")
         self.timeout = timeout if timeout is not None else settings.GITHUB_TIMEOUT or 30
+        self.git_timeout = getattr(settings, "GIT_TIMEOUT", 60)
 
     def _get_headers(self, accept: str = "application/vnd.github.v3+json") -> Dict[str, str]:
         """Build request headers with optional Bearer/token authorization."""
@@ -110,6 +111,15 @@ class GitHubClient:
             resp.raise_for_status()
             return resp.json()
 
+    def get_pr_changed_files(self, owner: str, repo: str, pr_number: int) -> List[str]:
+        """Retrieve list of changed file paths in a pull request."""
+        try:
+            files_data = self.get_pull_request_files(owner, repo, pr_number)
+            return [f.get("filename", "") for f in files_data if f.get("filename")]
+        except Exception as e:
+            logger.warning(f"Could not retrieve changed files via PR files API: {e}")
+            return []
+
     def get_authenticated_clone_url(self, clone_url: str) -> str:
         """Insert GITHUB_TOKEN safely into HTTPS clone URL without printing."""
         if self.token and "github.com" in clone_url and "x-access-token" not in clone_url:
@@ -125,7 +135,7 @@ class GitHubClient:
     ) -> Dict[str, Any]:
         """
         Clones repository using authentication, fetches PR branch, and generates unified diff.
-        Returns dict with diff_text, base_ref, and repo object.
+        Returns dict with diff_text, base_ref, target_dir, and changed_files.
         """
         import git
 
@@ -151,21 +161,15 @@ class GitHubClient:
         except Exception:
             pass
 
-        # Try diffing against origin/base_ref, fallback to diff against origin/master, origin/main, or HEAD~1
+        # Try diffing against origin/base_ref, fallback to origin/main or origin/HEAD
         diff_text = ""
-        for ref in [f"origin/{base_ref}", "origin/master", "origin/main", "origin/HEAD", "HEAD~1"]:
+        for ref in [f"origin/{base_ref}", f"{base_ref}", "origin/main", "origin/master", "origin/HEAD"]:
             try:
                 diff_text = repo.git.diff(f"{ref}...HEAD")
                 if diff_text:
                     break
             except Exception:
                 continue
-
-        if not diff_text:
-            try:
-                diff_text = repo.git.diff("HEAD~1")
-            except Exception:
-                diff_text = ""
 
         return {
             "diff_text": diff_text,

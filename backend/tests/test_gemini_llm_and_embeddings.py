@@ -29,8 +29,8 @@ class TestGeminiConfiguration:
     def test_settings_gemini_defaults(self):
         settings = Settings()
         assert settings.LLM_PROVIDER == "gemini"
-        assert settings.LLM_MODEL == "gemini-3.6-flash"
-        assert settings.GEMINI_LLM_MODEL == "gemini-3.6-flash"
+        assert settings.LLM_MODEL == "gemini-2.5-flash"
+        assert settings.GEMINI_LLM_MODEL == "gemini-2.5-flash"
         assert settings.EMBEDDING_PROVIDER == "gemini"
         assert settings.EMBEDDING_MODEL == "gemini-embedding-2"
         assert settings.GEMINI_EMBEDDING_MODEL == "gemini-embedding-2"
@@ -60,20 +60,20 @@ class TestGeminiLLMClient:
     """Test GeminiClient execution, sampling parameter constraints, and error handling."""
 
     def test_gemini_client_provider_name(self):
-        client = GeminiClient(api_key="mock_key", model="gemini-3.6-flash")
+        client = GeminiClient(api_key="mock_key", model="gemini-2.5-flash")
         assert client.provider_name == "gemini"
-        assert client.model == "gemini-3.6-flash"
+        assert client.model == "gemini-2.5-flash"
 
     def test_gemini_client_missing_key_error(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "")
         monkeypatch.setenv("LLM_API_KEY", "")
-        client = GeminiClient(api_key="", model="gemini-3.6-flash")
+        client = GeminiClient(api_key="", model="gemini-2.5-flash")
         with pytest.raises(ValueError) as excinfo:
             client._get_client()
         assert "Gemini API key is required" in str(excinfo.value)
 
     def test_gemini_client_structured_generation_omits_deprecated_params(self):
-        client = GeminiClient(api_key="test_valid_key", model="gemini-3.6-flash")
+        client = GeminiClient(api_key="test_valid_key", model="gemini-2.5-flash")
 
         mock_response = MagicMock()
         mock_response.text = '{"review_summary": "Test review", "overall_severity": "low", "findings": [], "evidence_summary": "Clean", "reasoning_trace": "None", "confidence": 0.9, "priority": "low", "remediation_summary": "", "code_suggestions": [], "references": [], "review_metadata": {}}'
@@ -89,7 +89,7 @@ class TestGeminiLLMClient:
         # Verify generate_content call arguments
         mock_genai_client.models.generate_content.assert_called_once()
         call_kwargs = mock_genai_client.models.generate_content.call_args[1]
-        assert call_kwargs["model"] == "gemini-3.6-flash"
+        assert call_kwargs["model"] == "gemini-2.5-flash"
         gen_config = call_kwargs.get("config")
         if gen_config is not None:
             # Crucial: temperature, top_p, top_k should NOT be configured
@@ -98,7 +98,7 @@ class TestGeminiLLMClient:
             assert getattr(gen_config, "top_k", None) is None
 
     def test_gemini_client_raw_generation(self):
-        client = GeminiClient(api_key="test_valid_key", model="gemini-3.6-flash")
+        client = GeminiClient(api_key="test_valid_key", model="gemini-2.5-flash")
 
         mock_response = MagicMock()
         mock_response.text = "Raw generated summary"

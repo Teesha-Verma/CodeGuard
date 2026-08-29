@@ -59,7 +59,14 @@ class PipelineOrchestrator:
         self.aggregator = FeatureAggregator()
         self.review_generator = ReviewGenerator(review_id)
 
-    def process_file(self, diff_file: DiffFile, repo_path: str, verbose_ast: bool = False) -> FileReport:
+    def process_file(
+        self,
+        diff_file: DiffFile,
+        repo_path: str,
+        repo_intelligence: Optional[Dict[str, Any]] = None,
+        sources_cache: Optional[Dict[str, str]] = None,
+        verbose_ast: bool = False
+    ) -> FileReport:
         """Processes a single file through the complete analysis and reasoning pipeline."""
         self.logger.info(f"Processing file: {diff_file.file_path}")
 
@@ -187,20 +194,21 @@ class PipelineOrchestrator:
 
         # 6. Repository Intelligence Analysis
         repo_start = time.perf_counter()
-        repo_intel: Dict[str, Any] = {}
-        try:
-            if os.path.isdir(repo_path):
-                sources = {}
-                for root, _, files in os.walk(repo_path):
-                    for f in files:
-                        if f.endswith(".py"):
-                            full_p = os.path.join(root, f)
-                            rel_p = os.path.relpath(full_p, repo_path).replace("\\", "/")
-                            try:
-                                with open(full_p, "r", encoding="utf-8") as rf:
-                                    sources[rel_p] = rf.read()
-                            except Exception:
-                                pass
+        repo_intel: Dict[str, Any] = repo_intelligence or {}
+        if not repo_intel:
+            try:
+                sources = sources_cache or {}
+                if not sources and os.path.isdir(repo_path):
+                    for root, _, files in os.walk(repo_path):
+                        for f in files:
+                            if f.endswith(".py"):
+                                full_p = os.path.join(root, f)
+                                rel_p = os.path.relpath(full_p, repo_path).replace("\\", "/")
+                                try:
+                                    with open(full_p, "r", encoding="utf-8") as rf:
+                                        sources[rel_p] = rf.read()
+                                except Exception:
+                                    pass
                 if sources:
                     query_engine = RepositoryQueryEngine(sources=sources, changed_files=[diff_file.file_path])
                     repo_intel = {
@@ -208,8 +216,8 @@ class PipelineOrchestrator:
                         "hotspots": [h.to_dict() for h in query_engine.find_hotspots(top_n=3)],
                         "change_impact": query_engine.find_change_impact().to_dict() if query_engine.find_change_impact() else {},
                     }
-        except Exception as repo_err:
-            self.logger.debug(f"Repository intelligence skipped for {diff_file.file_path}: {repo_err}")
+            except Exception as repo_err:
+                self.logger.debug(f"Repository intelligence skipped for {diff_file.file_path}: {repo_err}")
         repo_duration = (time.perf_counter() - repo_start) * 1000
 
         self.traces.append({

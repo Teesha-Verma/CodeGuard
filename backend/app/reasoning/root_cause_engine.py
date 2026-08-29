@@ -133,5 +133,6 @@ class RootCauseEngine:
             "trigger_condition": "Triggers during execution of line.",
             "fix": "Please review the highlighted line and fix according to standard practices.",
             "patch": "",
-            "issue_type": finding.get("issue_type", "code_smell")
+            "issue_type": finding.get("issue_type", "code_smell"),
+            "reasoning_source": "static_analysis"
         }

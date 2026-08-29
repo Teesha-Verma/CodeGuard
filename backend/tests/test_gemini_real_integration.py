@@ -2,7 +2,7 @@
 CodeGuard V2 — Real Google Gemini API Integration Tests.
 
 Validates:
-- Real Gemini 3.6 Flash structured review generation (JSON output mode)
+- Real Gemini 2.5 Flash-Lite structured review generation (JSON output mode)
 - Real Gemini Embedding 2 vector generation (768 dimensions)
 - Real Vector Store indexing and cosine similarity search
 - Strict credential safety (no secret leakage)
@@ -30,7 +30,7 @@ class TestGeminiRealIntegration:
     """Real Google Gemini API integration tests with configured GEMINI_API_KEY."""
 
     def test_gemini_real_llm_client_structured_generation(self, settings):
-        """Verify real Gemini 3.6 Flash generates structured JSON for code review."""
+        """Verify real Gemini 2.5 Flash-Lite generates structured JSON for code review."""
         llm_client = LLMClient(review_id="test_real_gemini_llm")
 
         payload = {
