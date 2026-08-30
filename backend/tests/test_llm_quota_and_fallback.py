@@ -124,14 +124,16 @@ class TestLLMClientQuotaAndFallback:
     def test_successful_gemini_request_and_normalization(self):
         client = LLMClient(review_id="rev_success_1")
         client.api_key = "test_key"
-        client.provider = "gemini"
+        client.provider = "groq"
 
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"explanation": "Insecure input", "suggestion": "Sanitize variable"}'
         mock_resp = MagicMock()
-        mock_resp.text = '{"explanation": "Insecure input", "suggestion": "Sanitize variable"}'
+        mock_resp.choices = [mock_choice]
 
-        mock_genai_client = MagicMock()
-        mock_genai_client.models.generate_content.return_value = mock_resp
-        client._client = mock_genai_client
+        mock_groq_client = MagicMock()
+        mock_groq_client.chat.completions.create.return_value = mock_resp
+        client._client = mock_groq_client
 
         res = client.generate_structured(
             system_prompt="Analyze code",
@@ -146,18 +148,20 @@ class TestLLMClientQuotaAndFallback:
     def test_transient_429_rpm_retry_and_recovery(self):
         client = LLMClient(review_id="rev_rpm_retry")
         client.api_key = "test_key"
-        client.provider = "gemini"
+        client.provider = "groq"
 
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"root_cause": "SQL injection hazard", "fix": "Use parameters"}'
         mock_resp = MagicMock()
-        mock_resp.text = '{"root_cause": "SQL injection hazard", "fix": "Use parameters"}'
+        mock_resp.choices = [mock_choice]
 
-        mock_genai_client = MagicMock()
+        mock_groq_client = MagicMock()
         # First call fails with transient 429 RPM, second call succeeds
-        mock_genai_client.models.generate_content.side_effect = [
-            Exception("429 RESOURCE_EXHAUSTED: GenerateRequestsPerMinutePerProjectPerModel quota exceeded"),
+        mock_groq_client.chat.completions.create.side_effect = [
+            Exception("429 rate_limit_exceeded: Rate limit reached for model"),
             mock_resp
         ]
-        client._client = mock_genai_client
+        client._client = mock_groq_client
 
         res = client.generate_structured(
             system_prompt="Analyze code",
@@ -166,28 +170,29 @@ class TestLLMClientQuotaAndFallback:
 
         assert res is not None
         assert res["root_cause"] == "SQL injection hazard"
-        assert mock_genai_client.models.generate_content.call_count == 2
+        assert mock_groq_client.chat.completions.create.call_count == 2
 
     def test_daily_quota_exhaustion_switches_model_without_retrying_exhausted(self):
         client = LLMClient(review_id="rev_daily_quota")
         client.api_key = "test_key"
-        client.provider = "gemini"
-        client.model = "gemini-2.5-flash"
+        client.provider = "groq"
+        primary_model = client.model
 
-        mock_resp_lite = MagicMock()
-        mock_resp_lite.text = '{"root_cause": "Handled by fallback", "fix": "Fixed"}'
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"root_cause": "Handled by fallback", "fix": "Fixed"}'
+        mock_resp = MagicMock()
+        mock_resp.choices = [mock_choice]
 
-        mock_genai_client = MagicMock()
+        mock_groq_client = MagicMock()
 
-        def mock_generate(model, contents, config):
-            if model == "gemini-2.5-flash":
-                raise Exception("429 RESOURCE_EXHAUSTED: GenerateRequestsPerDayPerProjectPerModel-FreeTier quotaValue = 20")
-            elif model == "gemini-3.5-flash-lite":
-                return mock_resp_lite
-            raise ValueError(f"Unexpected model {model}")
+        def mock_create(*args, **kwargs):
+            m = kwargs.get("model")
+            if m == primary_model:
+                raise Exception("429 requests_per_day daily quota exceeded")
+            return mock_resp
 
-        mock_genai_client.models.generate_content.side_effect = mock_generate
-        client._client = mock_genai_client
+        mock_groq_client.chat.completions.create.side_effect = mock_create
+        client._client = mock_groq_client
 
         res = client.generate_structured(
             system_prompt="Analyze code",
@@ -196,30 +201,30 @@ class TestLLMClientQuotaAndFallback:
 
         assert res is not None
         assert res["root_cause"] == "Handled by fallback"
-        assert client.tracker.is_model_exhausted("gemini-2.5-flash") is True
+        assert client.tracker.is_model_exhausted(primary_model) is True
 
-        # Second request for the same review: gemini-2.5-flash must NOT be called again!
-        mock_genai_client.models.generate_content.reset_mock()
+        # Second request for the same review: primary model must NOT be called again!
+        mock_groq_client.chat.completions.create.reset_mock()
         res2 = client.generate_structured(
             system_prompt="Analyze code 2",
             user_content='{"issue": "eval_2"}'
         )
         assert res2 is not None
-        # Verify gemini-2.5-flash was never passed in the second request
-        for call_args in mock_genai_client.models.generate_content.call_args_list:
+        # Verify primary model was never passed in the second request
+        for call_args in mock_groq_client.chat.completions.create.call_args_list:
             _, kwargs = call_args
-            assert kwargs.get("model") != "gemini-2.5-flash"
+            assert kwargs.get("model") != primary_model
 
     def test_all_models_exhausted_triggers_degraded_mode(self):
         client = LLMClient(review_id="rev_all_exhausted")
         client.api_key = "test_key"
-        client.provider = "gemini"
+        client.provider = "groq"
 
-        mock_genai_client = MagicMock()
-        mock_genai_client.models.generate_content.side_effect = Exception(
-            "429 RESOURCE_EXHAUSTED: GenerateRequestsPerDayPerProjectPerModel"
+        mock_groq_client = MagicMock()
+        mock_groq_client.chat.completions.create.side_effect = Exception(
+            "429 daily quota exceeded per_day"
         )
-        client._client = mock_genai_client
+        client._client = mock_groq_client
 
         res = client.generate_structured(
             system_prompt="Analyze code",
@@ -244,13 +249,13 @@ class TestLLMClientQuotaAndFallback:
     def test_auth_error_fails_fast_without_cycling_models(self):
         client = LLMClient(review_id="rev_auth_fail")
         client.api_key = "invalid_key"
-        client.provider = "gemini"
+        client.provider = "groq"
 
-        mock_genai_client = MagicMock()
-        mock_genai_client.models.generate_content.side_effect = Exception(
-            "403 PERMISSION_DENIED: API_KEY_INVALID"
+        mock_groq_client = MagicMock()
+        mock_groq_client.chat.completions.create.side_effect = Exception(
+            "401 invalid_api_key: Invalid API Key provided"
         )
-        client._client = mock_genai_client
+        client._client = mock_groq_client
 
         res = client.generate_structured(
             system_prompt="Analyze code",
@@ -259,7 +264,7 @@ class TestLLMClientQuotaAndFallback:
 
         assert res is None
         # Must fail fast (only 1 call, no retries on invalid credentials)
-        assert mock_genai_client.models.generate_content.call_count == 1
+        assert mock_groq_client.chat.completions.create.call_count == 1
 
 
 class TestRAGClientAndEmbeddings:

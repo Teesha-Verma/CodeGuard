@@ -28,9 +28,7 @@ class TestGeminiConfiguration:
 
     def test_settings_gemini_defaults(self):
         settings = Settings()
-        assert settings.LLM_PROVIDER == "gemini"
-        assert settings.LLM_MODEL == "gemini-2.5-flash"
-        assert settings.GEMINI_LLM_MODEL == "gemini-2.5-flash"
+        assert settings.LLM_PROVIDER == "groq"
         assert settings.EMBEDDING_PROVIDER == "gemini"
         assert settings.EMBEDDING_MODEL == "gemini-embedding-2"
         assert settings.GEMINI_EMBEDDING_MODEL == "gemini-embedding-2"

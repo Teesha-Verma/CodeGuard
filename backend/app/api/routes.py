@@ -1,10 +1,11 @@
 import uuid
 import logging
-from typing import Optional
+from typing import Optional, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.api.schemas import ReviewRequest, SnippetReviewRequest, ReviewStatusResponse, ReviewReport
+from app.api.schemas import ReviewRequest, SnippetReviewRequest, ReviewStatusResponse, ReviewReport, FileReport, ReviewIssue
+from app.evaluation.metrics import MetricsCalculator
 from app.core.logger import get_logger
 from app.core.config import Settings
 from app.api.dependencies import get_app_settings, get_app_logger
@@ -94,7 +95,7 @@ async def submit_snippet_review(
 
 
 @router.get("/{review_id}", response_model=ReviewReport)
-async def get_review_status(
+def get_review_status(
     review_id: str,
     logger: logging.Logger = Depends(get_app_logger),
     db: Session = Depends(get_db)
@@ -102,6 +103,7 @@ async def get_review_status(
     logger.info(f"Fetching review status for {review_id}", extra={"review_id": review_id})
 
     review = None
+    repo_repository = None
     try:
         repo_repository = ReviewRepository(db)
         review = repo_repository.get_review(review_id)
@@ -129,6 +131,61 @@ async def get_review_status(
             return JSONResponse(content=disk_report.model_dump())
         elif review.status == "timed_out":
             raise HTTPException(status_code=504, detail="Review execution timed out.")
+        elif repo_repository:
+            # Fallback to DB reconstruction if disk report is not on local filesystem
+            try:
+                db_issues = repo_repository.get_issues(review_id)
+                issues_by_file: Dict[str, list] = {}
+                for dbi in db_issues:
+                    evidence = dbi.evidence or {}
+                    issue_obj = ReviewIssue(
+                        line=dbi.line_number or 1,
+                        severity=dbi.severity or "medium",
+                        confidence=dbi.confidence or 0.8,
+                        issue=dbi.issue_description or "",
+                        root_cause=dbi.root_cause or "",
+                        trigger_condition=dbi.trigger_condition or "",
+                        fix=dbi.fix_suggestion or "",
+                        patch=dbi.patch,
+                        issue_type=dbi.issue_type or "code_smell",
+                        sources=dbi.sources or ["ast"],
+                        reasoning_trace=dbi.reasoning_trace or [],
+                        evidence=evidence,
+                        signal_priority=evidence.get("signal_priority", "medium"),
+                        issue_category=evidence.get("issue_category", "runtime logic risks"),
+                        is_low_signal=evidence.get("is_low_signal", False),
+                        detection_source=evidence.get("detection_source", "ast"),
+                        reasoning_source=evidence.get("reasoning_source", "static_analysis"),
+                        priority_score=evidence.get("priority_score", 0.50),
+                        detection_sources=evidence.get("detection_sources", ["ast"]),
+                    )
+                    issues_by_file.setdefault(dbi.file_path, []).append(issue_obj)
+
+                file_reports = [FileReport(file_path=fp, issues=issues) for fp, issues in issues_by_file.items()]
+                all_raw_issues = [
+                    {
+                        "severity": i.severity,
+                        "confidence": i.confidence,
+                        "sources": i.sources,
+                        "is_low_signal": i.is_low_signal,
+                        "detection_sources": i.detection_sources,
+                        "reasoning_source": i.reasoning_source
+                    }
+                    for fr in file_reports for i in (fr.meaningful_issues + fr.style_findings + fr.suppressed_findings)
+                ]
+                summary_stats = MetricsCalculator.compute_summary_stats(all_raw_issues)
+                reconstructed = ReviewReport(
+                    review_id=review_id,
+                    file_reports=file_reports,
+                    summary_stats=summary_stats,
+                    evaluation_metrics=None,
+                    trace_id=review_id
+                )
+                from fastapi.responses import JSONResponse
+                return JSONResponse(content=reconstructed.model_dump())
+            except Exception as recon_err:
+                logger.warning(f"Failed to reconstruct review report from DB: {recon_err}")
+                raise HTTPException(status_code=404, detail="Review report file not found on disk.")
         else:
             raise HTTPException(status_code=404, detail="Review report file not found on disk.")
 

@@ -48,27 +48,18 @@ def _save_review_results_to_db(review_id: str, file_reports: List[FileReport], t
                 except Exception as trace_err:
                     logger.debug(f"Could not save trace to DB: {trace_err}")
 
-            # Save issues
+            # Save issues — ALL categories (meaningful + style + suppressed)
             for file_report in file_reports:
-                for issue in file_report.meaningful_issues:
-                    try:
-                        issue_data = {
-                            "line": issue.line,
-                            "severity": issue.severity,
-                            "confidence": issue.confidence,
-                            "issue": issue.issue,
-                            "root_cause": issue.root_cause,
-                            "trigger_condition": issue.trigger_condition,
-                            "fix": issue.fix,
-                            "patch": issue.patch,
-                            "issue_type": issue.issue_type,
-                            "sources": issue.sources,
-                            "reasoning_trace": issue.reasoning_trace,
-                            "evidence": issue.evidence
-                        }
-                        repo.save_issue(review_id, file_report.file_path, issue_data)
-                    except Exception as issue_err:
-                        logger.debug(f"Could not save issue to DB: {issue_err}")
+                for category, issues_list in [
+                    ("meaningful", file_report.meaningful_issues),
+                    ("style", file_report.style_findings),
+                    ("suppressed", file_report.suppressed_findings),
+                ]:
+                    for issue in issues_list:
+                        try:
+                            repo.save_issue(review_id, file_report.file_path, issue, finding_category=category)
+                        except Exception as issue_err:
+                            logger.debug(f"Could not save {category} issue to DB: {issue_err}")
 
             return True
     except Exception as e:
@@ -235,21 +226,28 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
         all_parsed_diff_files = diff_parser.parse(diff_text)
 
         # Distinguish PRIMARY REVIEW FILES from SUPPORTING REPOSITORY CONTEXT
-        # If GitHub PR files list is available, scope primary analysis strictly to changed files
+        # Normalize paths cleanly (forward slashes, no leading './' or '/')
+        def _norm_path(p: str) -> str:
+            cleaned = p.strip().replace("\\", "/")
+            while cleaned.startswith("./"):
+                cleaned = cleaned[2:]
+            return cleaned.lstrip("/")
+
         primary_diff_files: List[DiffFile] = []
         if pr_changed_files:
-            pr_changed_set = set(pr_changed_files)
+            norm_pr_map = {_norm_path(cf): cf for cf in pr_changed_files if cf}
+            matched_norm_paths = set()
+
             for df in all_parsed_diff_files:
-                # Check exact match or relative match
-                if df.file_path in pr_changed_set:
+                df_norm = _norm_path(df.file_path)
+                if df_norm in norm_pr_map:
                     primary_diff_files.append(df)
-                elif any(df.file_path.endswith(cf) or cf.endswith(df.file_path) for cf in pr_changed_files):
-                    primary_diff_files.append(df)
-            # If no diff files matched directly (e.g. diff_text was from git diff with different prefix), synthesize DiffFiles for pr_changed_files
-            if not primary_diff_files:
-                for cf in pr_changed_files:
-                    if cf.endswith(".py"):
-                        primary_diff_files.append(DiffFile(file_path=cf, is_new=False, added_lines=[]))
+                    matched_norm_paths.add(df_norm)
+
+            # If any PR changed file was not captured in unified diff parser, synthesize DiffFile
+            for norm_p, orig_p in norm_pr_map.items():
+                if norm_p not in matched_norm_paths and norm_p.endswith(".py"):
+                    primary_diff_files.append(DiffFile(file_path=orig_p, is_new=False, added_lines=[]))
         else:
             primary_diff_files = [df for df in all_parsed_diff_files if df.file_path.endswith(".py")]
 
@@ -272,9 +270,9 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
         })
 
         # Explicit PR scope logging
-        logger.info(f"PR changed files: {len(pr_changed_files)}")
-        logger.info(f"Primary files analyzed: {len(primary_py_files)}")
-        logger.info(f"Supporting context files: {supporting_files_count}")
+        logger.info(f"PR Changed Files Detected: {len(pr_changed_files)}")
+        logger.info(f"Primary Files Analyzed: {len(primary_py_files)}")
+        logger.info(f"Supporting Context Files: {supporting_files_count}")
 
         if not primary_py_files:
             logger.warning("No modified Python files found for primary PR review.")
@@ -363,6 +361,17 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
 
         summary_stats = MetricsCalculator.compute_summary_stats(all_raw_issues)
 
+        # Attach partial review state if deadline was exceeded
+        if deadline_exceeded:
+            summary_stats["is_partial"] = True
+            summary_stats["partial_reason"] = (
+                f"Review exceeded maximum duration ({elapsed:.1f}s > {max_duration}s). "
+                f"Analyzed {len(file_reports)} of {len(primary_py_files)} primary files."
+            )
+            summary_stats["processed_files"] = len(file_reports)
+            summary_stats["total_files"] = len(primary_py_files)
+            summary_stats["remaining_files"] = len(primary_py_files) - len(file_reports)
+
         # Step G: Create & Persist Review Report
         review_report = ReviewReport(
             review_id=review_id,
@@ -380,7 +389,7 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
         _save_review_results_to_db(review_id, file_reports, all_traces)
 
         # Step H: Update final status
-        final_status = "timed_out" if deadline_exceeded and not file_reports else "completed"
+        final_status = "timed_out" if deadline_exceeded else "completed"
         _update_review_status_in_db(review_id, final_status)
         logger.info(f"PR review task {review_id} finished with status '{final_status}' in {time.time() - start_time:.2f}s")
 

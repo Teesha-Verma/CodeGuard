@@ -47,12 +47,12 @@ class TestReviewSchemaAndConfig:
         assert len(response.findings) == 1
         assert response.confidence == 0.95
 
-    def test_gemini_config_defaults_and_env(self, monkeypatch):
-        monkeypatch.setenv("GEMINI_API_KEY", "test_gemini_key_123")
-        monkeypatch.setenv("GEMINI_LLM_MODEL", "gemini-2.5-flash")
+    def test_groq_config_defaults_and_env(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "test_groq_key_123")
+        monkeypatch.setenv("GROQ_LLM_MODEL", "llama-3.3-70b-versatile")
         config = LLMConfig.from_env()
-        assert config.api_key == "test_gemini_key_123"
-        assert config.model == "gemini-2.5-flash"
+        assert config.api_key == "test_groq_key_123"
+        assert config.model == "llama-3.3-70b-versatile"
         assert config.json_mode is True
 
 

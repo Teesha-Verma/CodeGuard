@@ -22,6 +22,7 @@ class FeatureAggregator:
         call_graph_data: Optional[Dict[str, Any]] = None,
         dataflow_findings: Optional[List[Dict[str, Any]]] = None,
         repo_intelligence: Optional[Dict[str, Any]] = None,
+        code_content: Optional[str] = None,
     ) -> Dict[str, Any]:
 
         linter_summary = []
@@ -38,6 +39,7 @@ class FeatureAggregator:
             "file_path": diff_file.file_path,
             "changed_lines": diff_file.added_lines,
             "code_context": context_snippets,
+            "full_code": code_content or "",
             # AST and static analysis signals
             "ast_structural_metadata": ast_metadata or {},
             "complexity_metrics": complexity or {},
