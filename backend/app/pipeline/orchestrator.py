@@ -260,6 +260,7 @@ class PipelineOrchestrator:
             call_graph_data=call_graph_data,
             dataflow_findings=dataflow_findings,
             repo_intelligence=repo_intel,
+            code_content=code_content,
         )
 
         # 9. Grounded Review Issue Generation with RAG Knowledge

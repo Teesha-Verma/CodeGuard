@@ -2,14 +2,15 @@
 CodeGuard V2 — Review LLM Request Budget & Quota Tracker.
 
 Manages per-review request budgets, exhausted model tracking, rate-limit cooldowns,
-and degraded mode signaling to prevent retry storms and runaway API calls.
+degraded mode signaling, and detailed per-review request accounting to prevent
+retry storms and runaway API calls.
 """
 from __future__ import annotations
 
 import time
 import threading
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 
 from app.core.config import get_settings
 
@@ -18,18 +19,34 @@ logger = logging.getLogger(__name__)
 
 class ReviewLLMTracker:
     """
-    Thread-safe tracker managing the LLM request budget and quota availability for a single review.
+    Thread-safe tracker managing the LLM request budget, quota availability,
+    and detailed request accounting for a single review.
     """
 
     def __init__(self, review_id: str, max_requests: Optional[int] = None):
         self.review_id = review_id or "default"
         settings = get_settings()
-        self.max_requests = max_requests if max_requests is not None else settings.LLM_MAX_GENERATION_REQUESTS_PER_REVIEW
+        self.max_requests = (
+            max_requests
+            if max_requests is not None
+            else getattr(settings, "LLM_MAX_GENERATION_REQUESTS_PER_REVIEW", 25)
+        )
         self.requests_made = 0
         self.exhausted_models: Set[str] = set()
         self.temporarily_limited_models: Dict[str, float] = {}  # model -> cooldown_until_timestamp
         self.degraded_mode = False
         self.degraded_reason: Optional[str] = None
+
+        # Per-review accounting metrics (Problem 17)
+        self.llm_requests_attempted: int = 0
+        self.llm_requests_succeeded: int = 0
+        self.llm_requests_failed: int = 0
+        self.llm_requests_skipped_low_signal: int = 0
+        self.llm_requests_skipped_budget: int = 0
+        self.llm_models_used: Set[str] = set()
+        self.llm_tokens_requested: int = 0
+        self.llm_tokens_used: int = 0
+
         self._lock = threading.Lock()
 
     def can_request(self) -> bool:
@@ -51,6 +68,38 @@ class ReviewLLMTracker:
         """Return remaining allowed generation requests."""
         with self._lock:
             return max(0, self.max_requests - self.requests_made)
+
+    def record_attempt(self, model: str) -> None:
+        """Record an attempt to call an LLM model."""
+        with self._lock:
+            self.llm_requests_attempted += 1
+            if model:
+                self.llm_models_used.add(model)
+
+    def record_success(self, model: str, prompt_tokens: int = 0, completion_tokens: int = 0) -> None:
+        """Record a successful LLM reasoning generation and token usage."""
+        with self._lock:
+            self.llm_requests_succeeded += 1
+            if model:
+                self.llm_models_used.add(model)
+            self.llm_tokens_requested += prompt_tokens
+            self.llm_tokens_used += (prompt_tokens + completion_tokens)
+
+    def record_failure(self, model: str, reason: str = "") -> None:
+        """Record a failed LLM reasoning call."""
+        with self._lock:
+            self.llm_requests_failed += 1
+            logger.debug(f"Review {self.review_id}: LLM call failed for model '{model}': {reason}")
+
+    def record_skipped_low_signal(self, count: int = 1) -> None:
+        """Record findings skipped because they are low-signal/style."""
+        with self._lock:
+            self.llm_requests_skipped_low_signal += count
+
+    def record_skipped_budget(self, count: int = 1) -> None:
+        """Record findings skipped because the review LLM budget was reached."""
+        with self._lock:
+            self.llm_requests_skipped_budget += count
 
     def mark_model_exhausted(self, model: str, reason: str = "daily_quota_exhausted") -> None:
         """
@@ -114,7 +163,7 @@ class ReviewLLMTracker:
             logger.warning(f"Review {self.review_id}: Set degraded mode due to '{reason}'.")
 
     def get_status(self) -> Dict[str, Any]:
-        """Return snapshot of tracker status."""
+        """Return snapshot of tracker status including full accounting."""
         with self._lock:
             return {
                 "review_id": self.review_id,
@@ -124,6 +173,15 @@ class ReviewLLMTracker:
                 "exhausted_models": list(self.exhausted_models),
                 "degraded_mode": self.degraded_mode,
                 "degraded_reason": self.degraded_reason,
+                # Accounting metrics
+                "llm_requests_attempted": self.llm_requests_attempted,
+                "llm_requests_succeeded": self.llm_requests_succeeded,
+                "llm_requests_failed": self.llm_requests_failed,
+                "llm_requests_skipped_low_signal": self.llm_requests_skipped_low_signal,
+                "llm_requests_skipped_budget": self.llm_requests_skipped_budget,
+                "llm_models_used": sorted(self.llm_models_used),
+                "llm_tokens_requested": self.llm_tokens_requested,
+                "llm_tokens_used": self.llm_tokens_used,
             }
 
 

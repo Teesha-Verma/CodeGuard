@@ -1,17 +1,15 @@
 """
-LLM Client package for Gemini integration.
+LLM Client package for Groq integration.
 """
 from .base_client import BaseLLMClient
-from .gemini_client import GeminiClient
+from .groq_client import GroqClient
 from .mock_client import MockGeminiClient, MockGroqClient
-
-# Backward compatibility aliases
-GroqClient = GeminiClient
+from .gemini_client import GeminiClient
 
 __all__ = [
     "BaseLLMClient",
-    "GeminiClient",
-    "MockGeminiClient",
     "GroqClient",
     "MockGroqClient",
+    "GeminiClient",
+    "MockGeminiClient",
 ]
