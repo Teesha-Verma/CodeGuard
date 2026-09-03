@@ -56,10 +56,23 @@ app.include_router(review_router)
 
 @app.get("/health", tags=["System"])
 def health_check():
+    groq_configured = bool(
+        settings.GROQ_API_KEY and settings.GROQ_API_KEY not in ("mock_key", "your_groq_api_key_here")
+    )
+    gemini_configured = bool(
+        settings.GEMINI_API_KEY and settings.GEMINI_API_KEY not in ("mock_key", "your_gemini_api_key_here")
+    )
     return {
         "status": "ok",
         "service": settings.APP_NAME,
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
+        "llm": {
+            "primary_provider": settings.LLM_PROVIDER,
+            "fallback_providers": settings.fallback_provider_list,
+            "groq_configured": groq_configured,
+            "gemini_llm_configured": gemini_configured,
+            "gemini_embeddings_configured": gemini_configured,
+        }
     }
 
 if __name__ == "__main__":

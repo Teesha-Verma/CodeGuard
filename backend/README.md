@@ -86,18 +86,53 @@ To eliminate line-order bias and prevent trivial formatting issues from consumin
 
 ---
 
-### 2.2. Groq LLM Reasoning & Fast Fallback Handling
+### 2.2. Multi-Provider LLM Reasoning & Fallback Architecture
 
-- **Primary Reasoning Model**: `llama-3.3-70b-versatile` (configurable via `LLM_MODEL`).
-- **Configured Fallback Models**: `llama-3.1-8b-instant`, `openai/gpt-oss-120b`, `qwen/qwen3.8-27b`, `groq/compound-mini`.
-- **Intelligent 429 Error Discrimination**:
-  - **Token-Per-Day (TPD) Quota Exhaustion**: When Groq returns a daily token limit error, the model is immediately marked permanently exhausted for the remainder of the review, retries are skipped (0 retry waste), and the pipeline instantly advances to the next fallback model.
-  - **Transient Request Rate Limits (RPM / TPM)**: Retries with bounded backoff (1–2s).
-- **Review-Aware Model State**: Once a model is exhausted in a review, all subsequent findings in that review skip the exhausted model automatically.
-- **Per-Review Accounting**: `ReviewLLMTracker` monitors:
-  - `llm_requests_attempted`, `llm_requests_succeeded`, `llm_requests_failed`
-  - `llm_requests_skipped_low_signal`, `llm_requests_skipped_budget`
-  - `llm_models_used`, `llm_tokens_requested`, `llm_tokens_used`
+CodeGuard V2 implements a robust two-level multi-provider LLM reasoning architecture:
+
+```
+                  Structured LLM Request
+                            │
+                            ▼
+              Shared Review Budget Check (≤25)
+                            │
+                            ▼
+             Prompt Deduplication Cache Check
+                            │
+                            ▼
+           ┌───────────────────────────────────┐
+           │        ProviderRouter             │
+           │  [Level 1: Provider Selection]    │
+           └────────────────┬──────────────────┘
+                            │
+        ┌───────────────────┴───────────────────┐
+        ▼                                       ▼
+┌───────────────────────────────┐   ┌───────────────────────────────┐
+│ Primary Provider: Groq        │   │ Fallback Provider: Gemini     │
+│ [Level 2: Model Cascade]      │   │ [Level 2: Model Cascade]      │
+│ 1. Primary: openai/gpt-oss-120b│  │ 1. Primary: gemini-3.5-flash │
+│ 2. Fallback: qwen/qwen3.8-27b │   │ 2. Fallback: gemini-3.5-flash-lite
+│ 3. Fallback: llama-3.3-70b    │   │ 3. Fallback: gemini-3.6-flash │
+│ 4. Fallback: llama-3.1-8b     │   └───────────────┬───────────────┘
+└───────────────┬───────────────┘                   │
+                │ Quota / Model Exhausted           │
+                └───────────────►───────────────────┘
+                                                    │ Both Providers Exhausted
+                                                    ▼
+                                    Deterministic Static Analysis
+                                    (Zero Pipeline Failures)
+```
+
+- **Two-Level Fallback**:
+  - **Level 1 (Provider Fallover)**: Groq acts as primary LLM. If Groq experiences rate limits, daily token quota (TPD) exhaustion, service outages, or model unavailability, the pipeline transparently fails over to Google Gemini LLM reasoning.
+  - **Level 2 (Model Cascade within Provider)**: Each provider cascades through ordered candidate models before giving up to the next provider.
+- **Intelligent Error Discrimination**:
+  - **Daily Quota / TPD Exhaustion**: Immediately switches with **zero wasteful retries**, permanently blacklisting the exhausted model/provider for the remainder of that review.
+  - **Temporary RPM Limits**: Applies bounded exponential backoff with jitter before retrying.
+- **Review-Aware Provider State**: Once a provider hits daily quota in a review, all subsequent findings in that review automatically bypass the exhausted provider without thrashing.
+- **Shared Request Budget**: Fallback requests replace the failed request; they never double-count against the review's `max_requests` limit.
+- **Finding-Level Traceability**: Every reasoning output records `reasoning_source: "llm"`, `llm_provider: "groq"|"gemini"`, and `llm_model: string` in both memory schemas and persisted database evidence.
+- **Per-Review Accounting**: `ReviewLLMTracker` records per-provider metrics (requests, successes, failures, rate limits, quota exhaustions, fallbacks triggered, token usage, and latency).
 
 ---
 
@@ -292,6 +327,9 @@ Execute the complete test suite:
 ```bash
 # Run all unit and pipeline verification tests
 pytest tests/test_pipeline.py tests/test_finding_separation.py tests/test_source_attribution.py tests/test_repository_intelligence.py tests/test_grounding.py tests/test_pipeline_reasoning_fix.py -v
+
+# Run multi-provider LLM failover and quota test suite
+pytest tests/test_multi_provider_llm.py tests/test_llm_quota_and_fallback.py -v
 
 # Run dedicated pipeline reasoning and invariant tests
 pytest tests/test_pipeline_reasoning_fix.py -v

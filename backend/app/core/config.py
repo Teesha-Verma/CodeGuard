@@ -93,18 +93,20 @@ class Settings(BaseSettings):
     GROQ_MAX_RETRIES: int = 2
     GROQ_REAL_TEST: bool = False
 
-    # ── Gemini (Embeddings Only) ──────────────────────────────────
+    # ── Gemini (LLM Reasoning & Generation) ───────────────────────
     GEMINI_API_KEY: str = ""
-    GEMINI_PRIMARY_MODEL: str = "gemini-2.5-flash"  # Deprecated
-    GEMINI_LLM_MODEL: str = "gemini-2.5-flash"  # Deprecated
-    GEMINI_FALLBACK_MODELS: str = "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash"  # Deprecated
+    GEMINI_PRIMARY_MODEL: str = "gemini-3.5-flash"
+    GEMINI_LLM_MODEL: str = "gemini-3.5-flash"
+    GEMINI_LLM_FALLBACK_MODELS: str = "gemini-3.5-flash-lite,gemini-3.6-flash"
+    GEMINI_FALLBACK_MODELS: str = "gemini-3.5-flash-lite,gemini-3.6-flash"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com"
     GEMINI_TIMEOUT: int = 60
     GEMINI_MAX_RETRIES: int = 2
 
     # ── LLM Configuration ─────────────────────────────────────────
-    LLM_PROVIDER: str = "groq"  # "groq" | "mock" | "gemini" | "openai"
+    LLM_PROVIDER: str = "groq"  # "groq" | "gemini" | "mock" | "openai"
+    LLM_FALLBACK_PROVIDERS: str = "gemini"  # comma-separated e.g. "gemini" or "groq"
     LLM_MODEL: str = "openai/gpt-oss-120b"
     LLM_API_KEY: str = ""
     LLM_MAX_TOKENS: int = 4096
@@ -119,6 +121,15 @@ class Settings(BaseSettings):
     GEMINI_REAL_TEST: bool = False
 
     @property
+    def fallback_provider_list(self) -> list[str]:
+        """Return parsed list of fallback LLM providers."""
+        if not self.LLM_FALLBACK_PROVIDERS:
+            return []
+        if isinstance(self.LLM_FALLBACK_PROVIDERS, str):
+            return [p.strip().lower() for p in self.LLM_FALLBACK_PROVIDERS.split(",") if p.strip()]
+        return [str(p).lower() for p in self.LLM_FALLBACK_PROVIDERS]
+
+    @property
     def groq_fallback_model_list(self) -> list[str]:
         """Return parsed list of Groq fallback models."""
         if isinstance(self.GROQ_FALLBACK_MODELS, str):
@@ -127,10 +138,11 @@ class Settings(BaseSettings):
 
     @property
     def gemini_fallback_model_list(self) -> list[str]:
-        """Return parsed list of Gemini fallback models (deprecated)."""
-        if isinstance(self.GEMINI_FALLBACK_MODELS, str):
-            return [m.strip() for m in self.GEMINI_FALLBACK_MODELS.split(",") if m.strip()]
-        return list(self.GEMINI_FALLBACK_MODELS)
+        """Return parsed list of Gemini fallback models."""
+        fallback = self.GEMINI_LLM_FALLBACK_MODELS or getattr(self, "GEMINI_FALLBACK_MODELS", "")
+        if isinstance(fallback, str):
+            return [m.strip() for m in fallback.split(",") if m.strip()]
+        return list(fallback)
 
     # ── RAG ──────────────────────────────────────────────────────
     RAG_ENABLED: bool = True
@@ -266,6 +278,14 @@ class Settings(BaseSettings):
         if not effective_key or effective_key in ("your_gemini_api_key_here", "mock_key"):
             raise ValueError(
                 "Gemini API key is required for Gemini embeddings."
+            )
+
+    def validate_gemini_llm_credentials(self) -> None:
+        """Validate that Gemini API credentials exist for Gemini LLM reasoning at runtime."""
+        effective_key = self.GEMINI_API_KEY or self.LLM_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("LLM_API_KEY")
+        if not effective_key or effective_key in ("your_gemini_api_key_here", "mock_key"):
+            raise ValueError(
+                "Gemini API key is required when Gemini LLM functionality is enabled."
             )
 
     model_config = {

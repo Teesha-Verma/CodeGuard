@@ -225,6 +225,7 @@ class TestLLMClientQuotaAndFallback:
             "429 daily quota exceeded per_day"
         )
         client._client = mock_groq_client
+        client.tracker.mark_provider_exhausted("gemini")
 
         res = client.generate_structured(
             system_prompt="Analyze code",
@@ -250,6 +251,7 @@ class TestLLMClientQuotaAndFallback:
         client = LLMClient(review_id="rev_auth_fail")
         client.api_key = "invalid_key"
         client.provider = "groq"
+        client.tracker.mark_provider_exhausted("gemini")
 
         mock_groq_client = MagicMock()
         mock_groq_client.chat.completions.create.side_effect = Exception(

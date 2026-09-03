@@ -346,12 +346,14 @@ class TestRateLimitAndFallback:
         tracker = get_review_tracker(review_id)
 
         client = LLMClient(review_id=review_id)
+        client.cache.clear()
         client.model = "openai/gpt-oss-120b"
         client.api_key = "gsk_test_key"
 
         mock_groq_instance = MagicMock()
         mock_groq_instance.chat.completions.create.side_effect = Exception("500 Internal Server Error")
         client._client = mock_groq_instance
+        tracker.mark_provider_exhausted("gemini")
 
         result = client.generate_structured("System prompt", "User content")
 

@@ -47,6 +47,25 @@ class ReviewLLMTracker:
         self.llm_tokens_requested: int = 0
         self.llm_tokens_used: int = 0
 
+        # Multi-provider state and metrics
+        self.exhausted_providers: Set[str] = set()
+        self.provider_metrics: Dict[str, Dict[str, Any]] = {
+            "groq": {
+                "requests": 0, "successes": 0, "failures": 0,
+                "rate_limits": 0, "quota_exhaustions": 0,
+                "fallbacks_triggered": 0, "fallback_requests": 0,
+                "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                "total_latency_ms": 0.0
+            },
+            "gemini": {
+                "requests": 0, "successes": 0, "failures": 0,
+                "rate_limits": 0, "quota_exhaustions": 0,
+                "fallbacks_triggered": 0, "fallback_requests": 0,
+                "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                "total_latency_ms": 0.0
+            }
+        }
+
         self._lock = threading.Lock()
 
     def can_request(self) -> bool:
@@ -155,6 +174,97 @@ class ReviewLLMTracker:
                     available.append(m)
             return available
 
+    def mark_provider_exhausted(self, provider: str, reason: str = "daily_quota_exhausted") -> None:
+        """Mark an entire provider (Groq or Gemini) as exhausted for this review."""
+        with self._lock:
+            p_key = provider.lower()
+            self.exhausted_providers.add(p_key)
+            if p_key in self.provider_metrics:
+                self.provider_metrics[p_key]["quota_exhaustions"] += 1
+            logger.warning(
+                f"Review {self.review_id}: Marked provider '{provider}' as exhausted ({reason}). "
+                f"Active exhausted providers: {sorted(self.exhausted_providers)}"
+            )
+
+    def is_provider_exhausted(self, provider: str) -> bool:
+        """Check if provider is exhausted for this review."""
+        with self._lock:
+            return provider.lower() in self.exhausted_providers
+
+    def record_provider_attempt(self, provider: str, model: str) -> None:
+        """Record a provider call attempt."""
+        with self._lock:
+            p_key = provider.lower()
+            if p_key not in self.provider_metrics:
+                self.provider_metrics[p_key] = {
+                    "requests": 0, "successes": 0, "failures": 0,
+                    "rate_limits": 0, "quota_exhaustions": 0,
+                    "fallbacks_triggered": 0, "fallback_requests": 0,
+                    "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                    "total_latency_ms": 0.0
+                }
+            self.provider_metrics[p_key]["requests"] += 1
+            if model:
+                self.llm_models_used.add(model)
+
+    def record_provider_success(
+        self,
+        provider: str,
+        model: str,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        latency_ms: float = 0.0,
+        fallback_used: bool = False
+    ) -> None:
+        """Record successful generation from a provider."""
+        with self._lock:
+            p_key = provider.lower()
+            if p_key not in self.provider_metrics:
+                self.provider_metrics[p_key] = {
+                    "requests": 0, "successes": 0, "failures": 0,
+                    "rate_limits": 0, "quota_exhaustions": 0,
+                    "fallbacks_triggered": 0, "fallback_requests": 0,
+                    "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                    "total_latency_ms": 0.0
+                }
+            metrics = self.provider_metrics[p_key]
+            metrics["successes"] += 1
+            metrics["prompt_tokens"] += prompt_tokens
+            metrics["completion_tokens"] += completion_tokens
+            metrics["total_tokens"] += (prompt_tokens + completion_tokens)
+            metrics["total_latency_ms"] += latency_ms
+            if fallback_used:
+                metrics["fallback_requests"] += 1
+
+    def record_provider_failure(self, provider: str, model: str, error_category: str, reason: str = "") -> None:
+        """Record failed generation from a provider."""
+        with self._lock:
+            p_key = provider.lower()
+            if p_key not in self.provider_metrics:
+                self.provider_metrics[p_key] = {
+                    "requests": 0, "successes": 0, "failures": 0,
+                    "rate_limits": 0, "quota_exhaustions": 0,
+                    "fallbacks_triggered": 0, "fallback_requests": 0,
+                    "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+                    "total_latency_ms": 0.0
+                }
+            metrics = self.provider_metrics[p_key]
+            metrics["failures"] += 1
+            if error_category == "TEMPORARY_RATE_LIMIT":
+                metrics["rate_limits"] += 1
+            elif error_category == "QUOTA_EXHAUSTED":
+                metrics["quota_exhaustions"] += 1
+
+    def record_provider_fallback(self, from_provider: str, to_provider: str) -> None:
+        """Record that a fallback occurred between providers."""
+        with self._lock:
+            from_key = from_provider.lower()
+            to_key = to_provider.lower()
+            if from_key in self.provider_metrics:
+                self.provider_metrics[from_key]["fallbacks_triggered"] += 1
+            if to_key in self.provider_metrics:
+                self.provider_metrics[to_key]["fallback_requests"] += 1
+
     def set_degraded_mode(self, reason: str) -> None:
         """Mark the review as operating in degraded mode (deterministic analysis only)."""
         with self._lock:
@@ -171,6 +281,7 @@ class ReviewLLMTracker:
                 "max_requests": self.max_requests,
                 "remaining_budget": max(0, self.max_requests - self.requests_made),
                 "exhausted_models": list(self.exhausted_models),
+                "exhausted_providers": list(self.exhausted_providers),
                 "degraded_mode": self.degraded_mode,
                 "degraded_reason": self.degraded_reason,
                 # Accounting metrics
@@ -182,6 +293,7 @@ class ReviewLLMTracker:
                 "llm_models_used": sorted(self.llm_models_used),
                 "llm_tokens_requested": self.llm_tokens_requested,
                 "llm_tokens_used": self.llm_tokens_used,
+                "provider_metrics": {k: dict(v) for k, v in self.provider_metrics.items()},
             }
 
 

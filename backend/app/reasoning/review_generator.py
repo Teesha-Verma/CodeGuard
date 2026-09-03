@@ -665,10 +665,15 @@ class ReviewGenerator:
             f"Confidence {conf_details['confidence']:.2f} calibrated from {len(conf_details['reasons'])} factors.",
             f"Priority score {priority_score:.2f} based on {sev} severity and category '{cat}'.",
         ]
+        llm_provider = ai_details.get("llm_provider") if reasoning_activated else None
+        llm_model = ai_details.get("llm_model") if reasoning_activated else None
+
         if reasoning_activated:
-            reasoning_trace.append("Root cause reasoned with Groq LLM.")
+            p_display = (llm_provider or "Groq").capitalize()
+            m_display = f" ({llm_model})" if llm_model and llm_model != "unknown" else ""
+            reasoning_trace.append(f"Root cause reasoned with {p_display} LLM{m_display}.")
         else:
-            reasoning_trace.append("Static rule explanation applied.")
+            reasoning_trace.append("Static rule explanation applied (Bypassed LLM reasoning).")
 
         # Ensure all detection sources are preserved
         detection_sources = list(finding.get("sources", []))
@@ -695,6 +700,8 @@ class ReviewGenerator:
             reasoning_source=reasoning_source,
             priority_score=priority_score,
             detection_sources=detection_sources,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
 
     # ═══════════════════════════════════════════════════════════════════
@@ -753,7 +760,7 @@ class ReviewGenerator:
         # Contextual templates based on rule and issue type
         if "eval" in rule_id.lower() or "eval" in issue_text.lower():
             return {
-                "root_cause": "Dynamic code execution via eval() allows arbitrary code execution if input is untrusted.",
+                "root_cause": "Static analysis detected potential hazardous behavior: dynamic code execution via eval() allows arbitrary code execution if input is untrusted.",
                 "trigger_condition": "Triggers whenever this code path receives externally influenced or untrusted strings.",
                 "fix": "Replace eval() with safe alternatives like ast.literal_eval() or dedicated parsers.",
                 "patch": "",
