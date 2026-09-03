@@ -54,6 +54,8 @@ class ReviewRepository:
         evidence["priority_score"] = data.get("priority_score", 0.50)
         evidence["detection_sources"] = data.get("detection_sources", [])
         evidence["finding_category"] = finding_category
+        evidence["llm_provider"] = data.get("llm_provider")
+        evidence["llm_model"] = data.get("llm_model")
 
         issue = ReviewIssueModel(
             id=issue_id,

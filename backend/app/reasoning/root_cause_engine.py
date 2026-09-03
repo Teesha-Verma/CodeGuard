@@ -128,6 +128,10 @@ class RootCauseEngine:
                 response["fix"] = ". ".join(fix_sentences[:3]) + "."
 
             response["reasoning_source"] = "llm"
+            if "llm_provider" not in response:
+                response["llm_provider"] = getattr(self.llm_client, "provider", "groq")
+            if "llm_model" not in response:
+                response["llm_model"] = getattr(self.llm_client, "model", "unknown")
             return response
 
         return {
@@ -136,7 +140,9 @@ class RootCauseEngine:
             "fix": "Please review the highlighted line and fix according to standard practices.",
             "patch": "",
             "issue_type": finding.get("issue_type", "code_smell"),
-            "reasoning_source": "static_analysis"
+            "reasoning_source": "static_analysis",
+            "llm_provider": None,
+            "llm_model": None
         }
 
     def _extract_localized_code(self, aggregated_context: Dict[str, Any], line_no: int) -> str:

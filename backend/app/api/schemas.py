@@ -33,6 +33,8 @@ class ReviewIssue(BaseModel):
     priority_score: float = Field(0.50, description="Unified priority score (0.0 to 1.0)")
     detection_sources: List[str] = Field(default_factory=list, description="List of detection tools/sources")
     file_path: Optional[str] = Field(None, description="Path to the reviewed file containing this issue")
+    llm_provider: Optional[str] = Field(None, description="LLM provider used for reasoning")
+    llm_model: Optional[str] = Field(None, description="LLM model used for reasoning")
 
     @model_serializer(mode="wrap")
     def serialize_model(self, handler) -> Dict[str, Any]:
@@ -54,7 +56,7 @@ class ReviewIssue(BaseModel):
                 "root_cause", "trigger_condition", "fix", "patch", "evidence", 
                 "sources", "detection_sources", "reasoning_trace", 
                 "issue_category", "reasoning_source", "priority_score",
-                "is_low_signal"
+                "is_low_signal", "llm_provider", "llm_model"
             ]
             for field in verbose_fields:
                 if field in data:
@@ -91,7 +93,7 @@ class ReviewIssue(BaseModel):
                 "root_cause", "trigger_condition", "fix", "patch", "evidence", 
                 "sources", "detection_sources", "reasoning_trace", 
                 "issue_category", "reasoning_source", "priority_score",
-                "is_low_signal"
+                "is_low_signal", "llm_provider", "llm_model"
             ]
             for field in verbose_fields:
                 if field in data:
