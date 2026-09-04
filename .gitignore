@@ -90,19 +90,42 @@ lerna-debug.log*
 
 frontend/dist/
 frontend/dist-ssr/
+frontend/out/
 frontend/.next/
 frontend/.nuxt/
 frontend/.cache/
 frontend/.vite/
 dist/
 build/
+out/
 .next/
 .nuxt/
 .cache/
 .vite/
+.turbo/
+.vercel/
+
+# TypeScript & Linter Caches
+*.tsbuildinfo
+next-env.d.ts
+.eslintcache
+.stylelintcache
+
+# Testing & Coverage
+coverage/
+frontend/coverage/
+
+# Yarn / Package Managers
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # ============================================================
-# IDE / EDITOR
+# IDE / EDITOR & AI ASSISTANTS
 # ============================================================
 .vscode/*
 !.vscode/extensions.json
@@ -125,6 +148,15 @@ build/
 .history/
 .history
 .ionide
+
+# AI Assistants & Local Agent metadata
+.cursor/
+.claude/
+.agent/
+.agents/
+.gemini/
+frontend/.agent/
+frontend/.gemini/
 
 # ============================================================
 # LOGS
