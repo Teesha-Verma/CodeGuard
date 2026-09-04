@@ -1,48 +1,63 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import RepoInput from "./pages/dashboard/RepoInput";
-import DiffExtractor from "./pages/dashboard/DiffExtractor";
-import StaticAnalysis from "./pages/dashboard/StaticAnalysis";
-import Linters from "./pages/dashboard/Linters";
-import LLMReasoning from "./pages/dashboard/LLMReasoning";
-import Evaluator from "./pages/dashboard/Evaluator";
-import ReviewOutput from "./pages/dashboard/ReviewOutput";
-import Report from "./pages/dashboard/Report";
-import NotFound from "./pages/NotFound";
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ThemeProvider } from '@/lib/context/ThemeContext';
+import { ActiveFindingProvider } from '@/lib/context/ActiveFindingContext';
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import DashboardPage from './pages/DashboardPage';
+import PRReviewPage from './pages/PRReviewPage';
+import SnippetReviewPage from './pages/SnippetReviewPage';
+import ReviewsHistoryPage from './pages/ReviewsHistoryPage';
+import ReviewDetailsPage from './pages/ReviewDetailsPage';
+import SettingsPage from './pages/SettingsPage';
+import NotFoundPage from './pages/NotFoundPage';
 
-const queryClient = new QueryClient();
+// Six Major Capabilities
+import LearnerPage from './pages/LearnerPage';
+import AssistantPage from './pages/AssistantPage';
+import PlaygroundPage from './pages/PlaygroundPage';
+import DataflowPage from './pages/DataflowPage';
+import SecurityHealthPage from './pages/SecurityHealthPage';
+import RiskViewPage from './pages/RiskViewPage';
+import AcademyPage from './pages/AcademyPage';
+import KnowledgeBasePage from './pages/KnowledgeBasePage';
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />}>
-            <Route index element={<RepoInput />} />
-            <Route path="diff" element={<DiffExtractor />} />
-            <Route path="ast" element={<StaticAnalysis />} />
-            <Route path="linters" element={<Linters />} />
-            <Route path="llm" element={<LLMReasoning />} />
-            <Route path="scorer" element={<Evaluator />} />
-            <Route path="review" element={<ReviewOutput />} />
-            <Route path="report" element={<Report />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+export default function App() {
+  return (
+    <ThemeProvider>
+      <ActiveFindingProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Marketing & Auth Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
 
-export default App;
+            {/* Authenticated Workspace Routes */}
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/review/pr" element={<PRReviewPage />} />
+            <Route path="/review/snippet" element={<SnippetReviewPage />} />
+            <Route path="/reviews" element={<ReviewsHistoryPage />} />
+            <Route path="/reviews/:reviewId" element={<ReviewDetailsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+
+            {/* Six Major Extended Capabilities */}
+            <Route path="/learn" element={<LearnerPage />} />
+            <Route path="/learn/academy" element={<AcademyPage />} />
+            <Route path="/learn/knowledge" element={<KnowledgeBasePage />} />
+            <Route path="/assistant" element={<AssistantPage />} />
+            <Route path="/playground" element={<PlaygroundPage />} />
+            <Route path="/dataflow" element={<DataflowPage />} />
+            <Route path="/security" element={<SecurityHealthPage />} />
+            <Route path="/security/risk" element={<RiskViewPage />} />
+
+            {/* Catch-all */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </BrowserRouter>
+      </ActiveFindingProvider>
+    </ThemeProvider>
+  );
+}
+
