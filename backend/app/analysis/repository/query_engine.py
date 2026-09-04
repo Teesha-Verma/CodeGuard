@@ -43,9 +43,17 @@ class RepositoryQueryEngine:
         summary = engine.find_repository_summary()
     """
 
-    def __init__(self) -> None:
-        self._file_paths: List[str] = []
-        self._file_sources: Dict[str, str] = {}
+    def __init__(
+        self,
+        file_paths: Optional[List[str]] = None,
+        file_sources: Optional[Dict[str, str]] = None,
+        sources: Optional[Dict[str, str]] = None,
+        changed_files: Optional[List[str]] = None,
+        complexity_data: Optional[Dict[str, int]] = None,
+    ) -> None:
+        self._file_paths: List[str] = file_paths or []
+        self._file_sources: Dict[str, str] = file_sources or sources or {}
+        self._changed_files: List[str] = changed_files or []
         self._dependency_graph: Dict[str, List[str]] = {}
         self._classifications: List[FileClassification] = []
         self._hotspots: List[Hotspot] = []
@@ -56,6 +64,15 @@ class RepositoryQueryEngine:
         self._dep_metrics: List[DependencyMetrics] = []
         self._repo_graph: Optional[RepositoryGraph] = None
         self._analyzed: bool = False
+
+        # If sources or file_paths were provided at initialization, run analysis immediately
+        if self._file_sources or self._file_paths:
+            paths = self._file_paths if self._file_paths else list(self._file_sources.keys())
+            self.analyze(
+                file_paths=paths,
+                file_sources=self._file_sources,
+                complexity_data=complexity_data
+            )
 
     # ── main analysis entry point ────────────────────────────────
 
@@ -125,11 +142,12 @@ class RepositoryQueryEngine:
 
     # ── query methods ────────────────────────────────────────────
 
-    def find_hotspots(self, n: int = 20) -> List[Hotspot]:
+    def find_hotspots(self, n: int = 20, top_n: Optional[int] = None) -> List[Hotspot]:
         """Return the top *n* risk hotspots."""
+        limit = top_n if top_n is not None else n
         return sorted(
             self._hotspots, key=lambda h: h.risk_score, reverse=True
-        )[:n]
+        )[:limit]
 
     def find_dependents(self, file_path: str) -> List[str]:
         """Return all files that depend on *file_path*."""
@@ -159,13 +177,16 @@ class RepositoryQueryEngine:
 
     def find_change_impact(
         self,
-        changed_files: List[str],
+        changed_files: Optional[List[str]] = None,
         hotspots: Optional[List[Hotspot]] = None,
-    ) -> ChangeImpact:
+    ) -> Optional[ChangeImpact]:
         """Analyze impact of changed files."""
+        files = changed_files if changed_files is not None else self._changed_files
+        if not files:
+            return None
         analyzer = ChangeImpactAnalyzer()
         return analyzer.calculate_impact(
-            changed_files,
+            files,
             self._dependency_graph,
             hotspots or self._hotspots,
         )

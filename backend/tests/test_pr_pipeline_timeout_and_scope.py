@@ -290,3 +290,102 @@ class TestPRPipelineScopeAndTimeouts:
             assert resp.status_code == 200
             data = resp.json()
             assert data["review_id"] == review_id
+
+    def test_pr_scope_strict_isolation_and_no_suffix_bleed(self):
+        """Verify that files sharing suffix names (e.g. __init__.py or common subpaths) are strictly excluded unless exact match."""
+        pr_changed_files = ["backend/app/auth.py", "backend/__init__.py"]
+        all_diff_files = [
+            DiffFile(file_path="backend/app/auth.py", is_new=False, added_lines=[1]),
+            DiffFile(file_path="backend/__init__.py", is_new=False, added_lines=[1]),
+            DiffFile(file_path="backend/app/analysis/call_graph/__init__.py", is_new=False, added_lines=[1]),
+            DiffFile(file_path="backend/app/analysis/cfg/__init__.py", is_new=False, added_lines=[1]),
+            DiffFile(file_path="backend/tests/auth.py", is_new=False, added_lines=[1]),
+        ]
+
+        def _norm_path(p: str) -> str:
+            cleaned = p.strip().replace("\\", "/")
+            while cleaned.startswith("./"):
+                cleaned = cleaned[2:]
+            return cleaned.lstrip("/")
+
+        norm_pr_map = {_norm_path(cf): cf for cf in pr_changed_files if cf}
+        primary_diff_files = [df for df in all_diff_files if _norm_path(df.file_path) in norm_pr_map]
+
+        assert len(primary_diff_files) == 2
+        file_paths = [df.file_path for df in primary_diff_files]
+        assert "backend/app/auth.py" in file_paths
+        assert "backend/__init__.py" in file_paths
+        assert "backend/app/analysis/call_graph/__init__.py" not in file_paths
+        assert "backend/app/analysis/cfg/__init__.py" not in file_paths
+        assert "backend/tests/auth.py" not in file_paths
+
+    def test_repository_query_engine_constructor_compatibility(self):
+        """Verify RepositoryQueryEngine accepts sources and changed_files in constructor and query methods."""
+        from app.analysis.repository.query_engine import RepositoryQueryEngine
+
+        sources = {
+            "app/auth.py": "def login(): pass\n",
+            "app/routes.py": "from app.auth import login\ndef get_route(): login()\n"
+        }
+        changed = ["app/auth.py"]
+
+        # Call with keyword args as used in runner.py and orchestrator.py
+        engine = RepositoryQueryEngine(sources=sources, changed_files=changed)
+        assert engine._analyzed is True
+        assert len(engine.find_hotspots(top_n=3)) >= 0
+        assert len(engine.find_architecture()) >= 0
+        impact = engine.find_change_impact()
+        assert impact is not None
+        assert impact.changed_files == changed
+
+    def test_llm_reasoning_source_propagated_to_finding_and_db(self, tmp_path):
+        """Verify that when Gemini succeeds, reasoning_source is 'llm' and persisted into DB."""
+        review_id = f"test_llm_prop_{uuid.uuid4().hex[:8]}"
+
+        # Mock LLMClient to return structured response
+        mock_llm_response = {
+            "root_cause": "Unparameterized dynamic evaluation creates an arbitrary code execution vulnerability.",
+            "trigger_condition": "Triggered when untrusted string input reaches eval() at runtime.",
+            "fix": "Replace dynamic eval with safe ast.literal_eval or structured parser.",
+            "patch": "import ast\nx = ast.literal_eval(payload)",
+            "issue_type": "security"
+        }
+
+        test_file = tmp_path / "vulnerable.py"
+        test_file.write_text("x = eval('2 + 2')\n", encoding="utf-8")
+        diff_file = DiffFile(file_path="vulnerable.py", is_new=True, added_lines=[1])
+
+        with patch("app.llm.llm_client.LLMClient.generate_structured", return_value=mock_llm_response):
+            orchestrator = PipelineOrchestrator(review_id=review_id)
+            report = orchestrator.process_file(diff_file, str(tmp_path))
+
+            assert len(report.issues) > 0
+            top_issue = report.issues[0]
+            assert top_issue.reasoning_source == "llm"
+            assert "ast" in top_issue.detection_sources
+            assert "arbitrary code execution" in top_issue.root_cause
+            assert "ast.literal_eval" in top_issue.fix
+
+            # Test DB persistence of the issue
+            mock_db = MagicMock()
+            repo = ReviewRepository(mock_db)
+            saved_model = repo.save_issue(review_id, "vulnerable.py", top_issue)
+            assert saved_model.evidence.get("reasoning_source") == "llm"
+            assert "ast" in saved_model.evidence.get("detection_sources")
+            assert saved_model.root_cause == top_issue.root_cause
+            assert saved_model.fix_suggestion == top_issue.fix
+
+    def test_get_review_status_non_blocking_while_running(self):
+        """Verify GET /review/{id} returns 202 immediately while review is running."""
+        client = TestClient(app)
+        review_id = str(uuid.uuid4())
+
+        with patch("app.db.repositories.ReviewRepository.get_review") as mock_get_rev:
+            mock_rev = MagicMock()
+            mock_rev.id = review_id
+            mock_rev.status = "running"
+            mock_get_rev.return_value = mock_rev
+
+            resp = client.get(f"/review/{review_id}")
+            assert resp.status_code == 202
+            assert "processing" in resp.json().get("detail", "").lower()

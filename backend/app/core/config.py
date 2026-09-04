@@ -9,9 +9,15 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Optional
+from dotenv import load_dotenv
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+if _env_path.exists():
+    load_dotenv(dotenv_path=_env_path, override=False)
 
 
 class Settings(BaseSettings):
@@ -78,35 +84,65 @@ class Settings(BaseSettings):
     E2E_GITHUB_REPO: Optional[str] = None
     E2E_GITHUB_PR_NUMBER: Optional[int] = None
 
-    # ── Gemini ───────────────────────────────────────────────────
+    # ── Groq (LLM Reasoning & Generation) ─────────────────────────
+    GROQ_API_KEY: str = ""
+    GROQ_PRIMARY_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_LLM_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_FALLBACK_MODELS: str = "qwen/qwen3.8-27b,groq/compound-mini,llama-3.3-70b-versatile,llama-3.1-8b-instant"
+    GROQ_TIMEOUT: int = 60
+    GROQ_MAX_RETRIES: int = 2
+    GROQ_REAL_TEST: bool = False
+
+    # ── Gemini (LLM Reasoning & Generation) ───────────────────────
     GEMINI_API_KEY: str = ""
-    GEMINI_PRIMARY_MODEL: str = "gemini-2.5-flash"
-    GEMINI_LLM_MODEL: str = "gemini-2.5-flash"
-    GEMINI_FALLBACK_MODELS: str = "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash"
+    GEMINI_PRIMARY_MODEL: str = "gemini-3.5-flash"
+    GEMINI_LLM_MODEL: str = "gemini-3.5-flash"
+    GEMINI_LLM_FALLBACK_MODELS: str = "gemini-3.5-flash-lite,gemini-3.6-flash"
+    GEMINI_FALLBACK_MODELS: str = "gemini-3.5-flash-lite,gemini-3.6-flash"
     GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-2"
     GEMINI_API_BASE_URL: str = "https://generativelanguage.googleapis.com"
     GEMINI_TIMEOUT: int = 60
     GEMINI_MAX_RETRIES: int = 2
 
-    # ── LLM ──────────────────────────────────────────────────────
-    LLM_PROVIDER: str = "gemini"  # "gemini" | "mock" | "openai"
-    LLM_MODEL: str = "gemini-2.5-flash"
+    # ── LLM Configuration ─────────────────────────────────────────
+    LLM_PROVIDER: str = "groq"  # "groq" | "gemini" | "mock" | "openai"
+    LLM_FALLBACK_PROVIDERS: str = "gemini"  # comma-separated e.g. "gemini" or "groq"
+    LLM_MODEL: str = "openai/gpt-oss-120b"
     LLM_API_KEY: str = ""
     LLM_MAX_TOKENS: int = 4096
     LLM_TIMEOUT: int = 60
     LLM_MAX_RETRIES: int = 2
-    LLM_MAX_GENERATION_REQUESTS_PER_REVIEW: int = 10
+    LLM_MAX_GENERATION_REQUESTS_PER_REVIEW: int = 25
+    LLM_MAX_CONTEXT_LINES: int = 50
+    LLM_MAX_CONTEXT_CHARS: int = 4000
     LLM_BACKOFF_BASE_SECONDS: float = 1.5
     LLM_CACHE_ENABLED: bool = True
     LLM_CACHE_TTL: int = 3600
     GEMINI_REAL_TEST: bool = False
 
     @property
+    def fallback_provider_list(self) -> list[str]:
+        """Return parsed list of fallback LLM providers."""
+        if not self.LLM_FALLBACK_PROVIDERS:
+            return []
+        if isinstance(self.LLM_FALLBACK_PROVIDERS, str):
+            return [p.strip().lower() for p in self.LLM_FALLBACK_PROVIDERS.split(",") if p.strip()]
+        return [str(p).lower() for p in self.LLM_FALLBACK_PROVIDERS]
+
+    @property
+    def groq_fallback_model_list(self) -> list[str]:
+        """Return parsed list of Groq fallback models."""
+        if isinstance(self.GROQ_FALLBACK_MODELS, str):
+            return [m.strip() for m in self.GROQ_FALLBACK_MODELS.split(",") if m.strip()]
+        return list(self.GROQ_FALLBACK_MODELS)
+
+    @property
     def gemini_fallback_model_list(self) -> list[str]:
         """Return parsed list of Gemini fallback models."""
-        if isinstance(self.GEMINI_FALLBACK_MODELS, str):
-            return [m.strip() for m in self.GEMINI_FALLBACK_MODELS.split(",") if m.strip()]
-        return list(self.GEMINI_FALLBACK_MODELS)
+        fallback = self.GEMINI_LLM_FALLBACK_MODELS or getattr(self, "GEMINI_FALLBACK_MODELS", "")
+        if isinstance(fallback, str):
+            return [m.strip() for m in fallback.split(",") if m.strip()]
+        return list(fallback)
 
     # ── RAG ──────────────────────────────────────────────────────
     RAG_ENABLED: bool = True
@@ -210,18 +246,17 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_configuration(self) -> "Settings":
         """Validate LLM and embedding configurations."""
-        # Align LLM_API_KEY with GEMINI_API_KEY if not explicitly set
-        if not self.GEMINI_API_KEY and self.LLM_API_KEY:
-            self.GEMINI_API_KEY = self.LLM_API_KEY
-        elif self.GEMINI_API_KEY and not self.LLM_API_KEY:
-            self.LLM_API_KEY = self.GEMINI_API_KEY
-
-        # Align GEMINI_LLM_MODEL with LLM_MODEL
-        if self.GEMINI_LLM_MODEL != self.LLM_MODEL:
-            if self.LLM_MODEL == "gemini-2.5-flash":
-                self.LLM_MODEL = self.GEMINI_LLM_MODEL
-            else:
-                self.GEMINI_LLM_MODEL = self.LLM_MODEL
+        # Align LLM_API_KEY with GROQ_API_KEY if using Groq
+        if self.LLM_PROVIDER == "groq":
+            if not self.GROQ_API_KEY and self.LLM_API_KEY:
+                self.GROQ_API_KEY = self.LLM_API_KEY
+            elif self.GROQ_API_KEY and not self.LLM_API_KEY:
+                self.LLM_API_KEY = self.GROQ_API_KEY
+            if self.GROQ_LLM_MODEL != self.LLM_MODEL:
+                if self.LLM_MODEL == "llama-3.3-70b-versatile":
+                    self.LLM_MODEL = self.GROQ_LLM_MODEL
+                else:
+                    self.GROQ_LLM_MODEL = self.LLM_MODEL
 
         # Align GEMINI_EMBEDDING_MODEL with EMBEDDING_MODEL
         if self.GEMINI_EMBEDDING_MODEL != self.EMBEDDING_MODEL:
@@ -229,16 +264,32 @@ class Settings(BaseSettings):
 
         return self
 
+    def validate_groq_credentials(self) -> None:
+        """Validate that Groq API credentials exist when required at runtime."""
+        effective_key = self.GROQ_API_KEY or self.LLM_API_KEY or os.environ.get("GROQ_API_KEY")
+        if not effective_key or effective_key in ("your_groq_api_key_here", "mock_key"):
+            raise ValueError(
+                "Groq API key is required when Groq LLM functionality is enabled."
+            )
+
     def validate_gemini_credentials(self) -> None:
-        """Validate that Gemini API credentials exist when required at runtime."""
-        effective_key = self.GEMINI_API_KEY or self.LLM_API_KEY or os.environ.get("GEMINI_API_KEY")
+        """Validate that Gemini API credentials exist for embeddings at runtime."""
+        effective_key = self.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
         if not effective_key or effective_key in ("your_gemini_api_key_here", "mock_key"):
             raise ValueError(
-                "Gemini API key is required when Gemini LLM or embedding functionality is enabled."
+                "Gemini API key is required for Gemini embeddings."
+            )
+
+    def validate_gemini_llm_credentials(self) -> None:
+        """Validate that Gemini API credentials exist for Gemini LLM reasoning at runtime."""
+        effective_key = self.GEMINI_API_KEY or self.LLM_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("LLM_API_KEY")
+        if not effective_key or effective_key in ("your_gemini_api_key_here", "mock_key"):
+            raise ValueError(
+                "Gemini API key is required when Gemini LLM functionality is enabled."
             )
 
     model_config = {
-        "env_file": ".env",
+        "env_file": str(_env_path),
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
         "extra": "ignore",

@@ -30,7 +30,7 @@ class ReviewRepository:
                 self.db.rollback()
                 raise
             
-    def save_issue(self, review_id: str, file_path: str, issue_data: Any) -> ReviewIssueModel:
+    def save_issue(self, review_id: str, file_path: str, issue_data: Any, finding_category: str = "meaningful") -> ReviewIssueModel:
         issue_id = str(uuid.uuid4())
 
         if hasattr(issue_data, "model_dump"):
@@ -53,6 +53,9 @@ class ReviewRepository:
         evidence["reasoning_source"] = data.get("reasoning_source", "static_analysis")
         evidence["priority_score"] = data.get("priority_score", 0.50)
         evidence["detection_sources"] = data.get("detection_sources", [])
+        evidence["finding_category"] = finding_category
+        evidence["llm_provider"] = data.get("llm_provider")
+        evidence["llm_model"] = data.get("llm_model")
 
         issue = ReviewIssueModel(
             id=issue_id,

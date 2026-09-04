@@ -12,8 +12,8 @@ from app.analysis.RAG.query_builder.builder import QueryBuilder
 from app.analysis.RAG.retrieval.engine import RetrievalEngine
 from app.analysis.RAG.context.assembler import ContextAssembler
 from app.analysis.RAG.prompt_builder.builder import PromptBuilder
-from app.analysis.RAG.llm.mock_client import MockGeminiClient
-from app.analysis.RAG.llm.gemini_client import GeminiClient
+from app.analysis.RAG.llm.mock_client import MockGroqClient, MockGeminiClient
+from app.analysis.RAG.llm.groq_client import GroqClient
 from app.analysis.RAG.review.merger import ReviewMerger
 
 
@@ -135,15 +135,15 @@ class PromptBuilderStage(BasePipelineStage):
 
 class LLMExecutionStage(BasePipelineStage):
     """
-    Executes GeminiClient/MockGeminiClient with retry logic and caching.
+    Executes GroqClient/MockGroqClient with retry logic and caching.
     """
 
     def __init__(self, mock_llm: bool = True):
         self.mock_llm = mock_llm
         if mock_llm:
-            self.client = MockGeminiClient()
+            self.client = MockGroqClient()
         else:
-            self.client = GeminiClient()
+            self.client = GroqClient()
 
     def execute(self, context: PipelineContext) -> PipelineContext:
         """

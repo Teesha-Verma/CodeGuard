@@ -13,6 +13,7 @@ from app.evaluation.metrics import MetricsCalculator
 from app.core.config import get_settings
 from app.core.logger import get_logger
 from app.analysis.repository.query_engine import RepositoryQueryEngine
+from app.analysis.repository.supporting_context import PRSupportingContextProvider
 
 
 def _update_review_status_in_db(review_id: str, status: str) -> bool:
@@ -48,27 +49,18 @@ def _save_review_results_to_db(review_id: str, file_reports: List[FileReport], t
                 except Exception as trace_err:
                     logger.debug(f"Could not save trace to DB: {trace_err}")
 
-            # Save issues
+            # Save issues — ALL categories (meaningful + style + suppressed)
             for file_report in file_reports:
-                for issue in file_report.meaningful_issues:
-                    try:
-                        issue_data = {
-                            "line": issue.line,
-                            "severity": issue.severity,
-                            "confidence": issue.confidence,
-                            "issue": issue.issue,
-                            "root_cause": issue.root_cause,
-                            "trigger_condition": issue.trigger_condition,
-                            "fix": issue.fix,
-                            "patch": issue.patch,
-                            "issue_type": issue.issue_type,
-                            "sources": issue.sources,
-                            "reasoning_trace": issue.reasoning_trace,
-                            "evidence": issue.evidence
-                        }
-                        repo.save_issue(review_id, file_report.file_path, issue_data)
-                    except Exception as issue_err:
-                        logger.debug(f"Could not save issue to DB: {issue_err}")
+                for category, issues_list in [
+                    ("meaningful", file_report.meaningful_issues),
+                    ("style", file_report.style_findings),
+                    ("suppressed", file_report.suppressed_findings),
+                ]:
+                    for issue in issues_list:
+                        try:
+                            repo.save_issue(review_id, file_report.file_path, issue, finding_category=category)
+                        except Exception as issue_err:
+                            logger.debug(f"Could not save {category} issue to DB: {issue_err}")
 
             return True
     except Exception as e:
@@ -235,27 +227,49 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
         all_parsed_diff_files = diff_parser.parse(diff_text)
 
         # Distinguish PRIMARY REVIEW FILES from SUPPORTING REPOSITORY CONTEXT
-        # If GitHub PR files list is available, scope primary analysis strictly to changed files
+        # Use exact normalized repository-relative paths:
+        # Strictly NO basename matching, NO suffix matching, NO substring matching
         primary_diff_files: List[DiffFile] = []
         if pr_changed_files:
-            pr_changed_set = set(pr_changed_files)
-            for df in all_parsed_diff_files:
-                # Check exact match or relative match
-                if df.file_path in pr_changed_set:
-                    primary_diff_files.append(df)
-                elif any(df.file_path.endswith(cf) or cf.endswith(df.file_path) for cf in pr_changed_files):
-                    primary_diff_files.append(df)
-            # If no diff files matched directly (e.g. diff_text was from git diff with different prefix), synthesize DiffFiles for pr_changed_files
-            if not primary_diff_files:
-                for cf in pr_changed_files:
-                    if cf.endswith(".py"):
-                        primary_diff_files.append(DiffFile(file_path=cf, is_new=False, added_lines=[]))
-        else:
-            primary_diff_files = [df for df in all_parsed_diff_files if df.file_path.endswith(".py")]
+            norm_pr_map = {DiffParser.normalize_path(cf): cf for cf in pr_changed_files if cf}
+            matched_norm_paths = set()
 
-        # Filter only Python files for primary analysis
-        primary_py_files = [df for df in primary_diff_files if df.file_path.endswith(".py")]
-        supporting_files_count = max(0, len(pr_changed_files) - len(primary_py_files))
+            for df in all_parsed_diff_files:
+                df_norm = DiffParser.normalize_path(df.file_path)
+                if df_norm in norm_pr_map:
+                    # Skip removed files from primary static analysis
+                    if not df.is_deleted:
+                        primary_diff_files.append(df)
+                    matched_norm_paths.add(df_norm)
+
+            # If any active PR changed file was not captured in unified diff parser, synthesize DiffFile
+            for norm_p, orig_p in norm_pr_map.items():
+                if norm_p not in matched_norm_paths and norm_p.endswith(".py"):
+                    cand_full = os.path.join(repo_dir, norm_p)
+                    if os.path.isfile(cand_full):
+                        primary_diff_files.append(DiffFile(file_path=orig_p, is_new=False, added_lines=[]))
+        else:
+            primary_diff_files = [
+                df for df in all_parsed_diff_files
+                if not df.is_deleted and df.file_path.endswith(".py")
+            ]
+
+        # Filter only non-deleted Python files for primary analysis
+        primary_py_files = [
+            df for df in primary_diff_files
+            if not df.is_deleted and df.file_path.endswith(".py")
+        ]
+
+        # Step D: Pre-load Scoped Supporting Context (NO repository-wide scanning)
+        # PRIMARY ANALYSIS SCOPE = EXACT PR CHANGES
+        # REPOSITORY = SUPPORTING CONTEXT ONLY
+        repo_intel_start = time.perf_counter()
+        context_provider = PRSupportingContextProvider(repo_dir=repo_dir)
+        context_bundle = context_provider.resolve_context(primary_diff_files=primary_py_files)
+        sources_cache = context_bundle.combined_sources_cache
+        repo_intel_map = context_bundle.repo_intelligence
+        supporting_files_count = len(context_bundle.supporting_files)
+        repo_intel_duration = (time.perf_counter() - repo_intel_start) * 1000
 
         diff_parse_duration = (time.perf_counter() - diff_parse_start) * 1000
         all_traces.append({
@@ -271,56 +285,34 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
             }
         })
 
+        all_traces.append({
+            "stage": "repository_supporting_context",
+            "duration_ms": repo_intel_duration,
+            "input_data": {
+                "primary_files": len(primary_py_files),
+                "supporting_files": supporting_files_count
+            },
+            "output_data": {
+                "supporting_files_resolved": context_bundle.supporting_files,
+                "symbols_count": len(context_bundle.supporting_symbols),
+                "architecture_patterns": len(repo_intel_map.get("architecture", [])),
+                "hotspots": len(repo_intel_map.get("hotspots", []))
+            }
+        })
+
         # Explicit PR scope logging
-        logger.info(f"PR changed files: {len(pr_changed_files)}")
-        logger.info(f"Primary files analyzed: {len(primary_py_files)}")
-        logger.info(f"Supporting context files: {supporting_files_count}")
+        logger.info(f"PR Changed Files Detected: {len(pr_changed_files or primary_py_files)}")
+        logger.info(f"Primary Files Analyzed: {len(primary_py_files)}")
+        logger.info(f"Supporting Context Files: {supporting_files_count}")
 
         if not primary_py_files:
             logger.warning("No modified Python files found for primary PR review.")
-
-        # Step D: Pre-load Repository Source Cache & Pre-compute Repo Intelligence ONCE
-        sources_cache: Dict[str, str] = {}
-        if os.path.isdir(repo_dir):
-            for root, _, files in os.walk(repo_dir):
-                for f in files:
-                    if f.endswith(".py"):
-                        full_p = os.path.join(root, f)
-                        rel_p = os.path.relpath(full_p, repo_dir).replace("\\", "/")
-                        try:
-                            with open(full_p, "r", encoding="utf-8") as rf:
-                                sources_cache[rel_p] = rf.read()
-                        except Exception:
-                            pass
-
-        repo_intel_map: Dict[str, Any] = {}
-        if sources_cache:
-            repo_intel_start = time.perf_counter()
-            try:
-                changed_paths = [df.file_path for df in primary_py_files]
-                query_engine = RepositoryQueryEngine(sources=sources_cache, changed_files=changed_paths)
-                repo_intel_map = {
-                    "architecture": [a.to_dict() for a in query_engine.find_architecture()],
-                    "hotspots": [h.to_dict() for h in query_engine.find_hotspots(top_n=5)],
-                    "change_impact": query_engine.find_change_impact().to_dict() if query_engine.find_change_impact() else {},
-                }
-            except Exception as repo_err:
-                logger.warning(f"Pre-computed repository intelligence error: {repo_err}")
-            repo_intel_duration = (time.perf_counter() - repo_intel_start) * 1000
-            all_traces.append({
-                "stage": "repository_intelligence_global",
-                "duration_ms": repo_intel_duration,
-                "input_data": {"sources_count": len(sources_cache), "changed_files": len(primary_py_files)},
-                "output_data": {
-                    "architecture_patterns": len(repo_intel_map.get("architecture", [])),
-                    "hotspots": len(repo_intel_map.get("hotspots", []))
-                }
-            })
 
         # Step E: Process Primary PR Files with Deadline Enforcement
         orchestrator = PipelineOrchestrator(review_id=review_id)
         file_reports: List[FileReport] = []
         deadline_exceeded = False
+        pr_changed_paths = [df.file_path for df in primary_py_files]
 
         for diff_file in primary_py_files:
             # Check deadline before processing each file
@@ -341,6 +333,8 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
                 repo_path=repo_dir,
                 repo_intelligence=repo_intel_map,
                 sources_cache=sources_cache,
+                supporting_context=context_bundle.supporting_symbols,
+                pr_changed_files=pr_changed_paths,
                 verbose_ast=verbose_ast
             )
             file_reports.append(report)
@@ -362,11 +356,27 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
                 })
 
         summary_stats = MetricsCalculator.compute_summary_stats(all_raw_issues)
+        summary_stats["files_analyzed"] = len(file_reports)
+        summary_stats["supporting_files_used"] = supporting_files_count
 
-        # Step G: Create & Persist Review Report
+        # Attach partial review state if deadline was exceeded
+        if deadline_exceeded:
+            summary_stats["is_partial"] = True
+            summary_stats["partial_reason"] = (
+                f"Review exceeded maximum duration ({elapsed:.1f}s > {max_duration}s). "
+                f"Analyzed {len(file_reports)} of {len(primary_py_files)} primary files."
+            )
+            summary_stats["processed_files"] = len(file_reports)
+            summary_stats["total_files"] = len(primary_py_files)
+            summary_stats["remaining_files"] = len(primary_py_files) - len(file_reports)
+
+        # Step G: Create & Persist Review Report (guaranteeing exact PR scope)
+        valid_paths_set = {df.file_path for df in primary_py_files}
+        pr_scoped_reports = [fr for fr in file_reports if fr.file_path in valid_paths_set]
+
         review_report = ReviewReport(
             review_id=review_id,
-            file_reports=file_reports,
+            file_reports=pr_scoped_reports,
             summary_stats=summary_stats,
             evaluation_metrics=None,
             trace_id=review_id
@@ -380,7 +390,7 @@ def run_pr_review_task(review_id: str, repo_url: str, pr_number: int, verbose_as
         _save_review_results_to_db(review_id, file_reports, all_traces)
 
         # Step H: Update final status
-        final_status = "timed_out" if deadline_exceeded and not file_reports else "completed"
+        final_status = "timed_out" if deadline_exceeded else "completed"
         _update_review_status_in_db(review_id, final_status)
         logger.info(f"PR review task {review_id} finished with status '{final_status}' in {time.time() - start_time:.2f}s")
 

@@ -12,12 +12,22 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import httpx
 
 from app.core.config import get_settings
 
 logger = logging.getLogger("codeguard.github")
+
+
+@dataclass
+class PRFileEntry:
+    """Structured representation of a file touched in a GitHub PR."""
+    path: str
+    status: str = "modified"  # "added", "modified", "renamed", "removed"
+    old_path: Optional[str] = None
+    patch: Optional[str] = None
 
 
 class GitHubClient:
@@ -111,11 +121,49 @@ class GitHubClient:
             resp.raise_for_status()
             return resp.json()
 
-    def get_pr_changed_files(self, owner: str, repo: str, pr_number: int) -> List[str]:
-        """Retrieve list of changed file paths in a pull request."""
+    def get_pr_file_entries(self, owner: str, repo: str, pr_number: int) -> List[PRFileEntry]:
+        """Retrieve list of modified files in a pull request with structured metadata."""
         try:
             files_data = self.get_pull_request_files(owner, repo, pr_number)
-            return [f.get("filename", "") for f in files_data if f.get("filename")]
+            entries = []
+            for f in files_data:
+                fn = str(f.get("filename", "")).strip().replace("\\", "/")
+                while fn.startswith("./"):
+                    fn = fn[2:]
+                fn = fn.lstrip("/")
+                if not fn:
+                    continue
+                status = str(f.get("status", "modified")).lower()
+                old_fn = f.get("previous_filename")
+                if old_fn:
+                    old_fn = str(old_fn).strip().replace("\\", "/")
+                    while old_fn.startswith("./"):
+                        old_fn = old_fn[2:]
+                    old_fn = old_fn.lstrip("/")
+                entries.append(PRFileEntry(
+                    path=fn,
+                    status=status,
+                    old_path=old_fn,
+                    patch=f.get("patch")
+                ))
+            return entries
+        except Exception as e:
+            logger.warning(f"Could not retrieve changed file entries via PR files API: {e}")
+            return []
+
+    def get_pr_changed_files(self, owner: str, repo: str, pr_number: int, include_removed: bool = False) -> List[str]:
+        """Retrieve list of changed file paths in a pull request (active/analyzable files by default)."""
+        entries = self.get_pr_file_entries(owner, repo, pr_number)
+        if entries:
+            if include_removed:
+                return [e.path for e in entries]
+            return [e.path for e in entries if e.status != "removed"]
+        try:
+            files_data = self.get_pull_request_files(owner, repo, pr_number)
+            return [
+                f.get("filename", "") for f in files_data
+                if f.get("filename") and (include_removed or f.get("status") != "removed")
+            ]
         except Exception as e:
             logger.warning(f"Could not retrieve changed files via PR files API: {e}")
             return []

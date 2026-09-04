@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 class LLMUsageMetrics(BaseModel):
     """Metrics for a single LLM request."""
-    provider: str = Field(default="gemini", description="The LLM provider (e.g., gemini).")
-    model_name: str = Field(default="gemini-2.5-flash", description="The name of the LLM model used.")
+    provider: str = Field(default="groq", description="The LLM provider (e.g., groq).")
+    model_name: str = Field(default="llama-3.3-70b-versatile", description="The name of the LLM model used.")
     prompt_tokens: int = Field(default=0, description="Number of tokens in the prompt.")
     completion_tokens: int = Field(default=0, description="Number of tokens in the generated completion.")
     total_tokens: int = Field(default=0, description="Total tokens used (prompt + completion).")
