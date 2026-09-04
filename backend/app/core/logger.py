@@ -11,10 +11,40 @@ import logging
 import json
 import sys
 import os
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
 from app.core.config import get_settings
+
+
+_SECRET_PATTERNS = [
+    # Groq API keys
+    (re.compile(r"gsk_[a-zA-Z0-9_\-]{15,}"), "gsk_***REDACTED***"),
+    # Gemini API keys
+    (re.compile(r"AIzaSy[a-zA-Z0-9_\-]{20,}"), "AIzaSy***REDACTED***"),
+    # GitHub personal access tokens
+    (re.compile(r"ghp_[a-zA-Z0-9]{20,}"), "ghp_***REDACTED***"),
+    (re.compile(r"github_pat_[a-zA-Z0-9_]{20,}"), "github_pat_***REDACTED***"),
+    # Bearer tokens in Authorization headers or strings
+    (re.compile(r"(Bearer\s+)[a-zA-Z0-9_\-\.]{16,}", re.IGNORECASE), r"\1***REDACTED***"),
+    # Passwords in URLs (PostgreSQL/database connection strings)
+    (re.compile(r"(postgres(?:ql)?://[^:]+:)([^@]+)(@)", re.IGNORECASE), r"\1***REDACTED***\3"),
+    # Explicit password assignments
+    (re.compile(r"(password\s*[:=]\s*['\"]?)([^'\"\s&]+)(['\"]?)", re.IGNORECASE), r"\1***REDACTED***\3"),
+    # Generic API key query parameters or assignments
+    (re.compile(r"((?:api[_-]?key|secret[_-]?key|token)\s*[:=]\s*['\"]?)([^'\"\s&]{8,})(['\"]?)", re.IGNORECASE), r"\1***REDACTED***\3"),
+]
+
+
+def mask_secrets(text: str) -> str:
+    """Sanitizes strings by masking API keys, passwords, and tokens."""
+    if not text or not isinstance(text, str):
+        return str(text or "")
+    sanitized = text
+    for pattern, replacement in _SECRET_PATTERNS:
+        sanitized = pattern.sub(replacement, sanitized)
+    return sanitized
 
 
 class JSONFormatter(logging.Formatter):
@@ -25,7 +55,7 @@ class JSONFormatter(logging.Formatter):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": mask_secrets(record.getMessage()),
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
@@ -38,9 +68,9 @@ class JSONFormatter(logging.Formatter):
         if hasattr(record, "duration_ms"):
             log_entry["duration_ms"] = record.duration_ms
 
-        # Attach exception info
+        # Attach exception info (safely masked)
         if record.exc_info and record.exc_info[1]:
-            log_entry["exception"] = self.formatException(record.exc_info)
+            log_entry["exception"] = mask_secrets(self.formatException(record.exc_info))
 
         return json.dumps(log_entry, default=str)
 

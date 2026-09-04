@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 
 from app.api.schemas import FileReport
 from app.core.logger import PipelineLogger
-from app.diff.diff_parser import DiffFile
+from app.diff.diff_parser import DiffFile, DiffParser
 from app.diff.context_builder import ContextBuilder
 
 # Upgraded Static Analysis
@@ -65,14 +65,28 @@ class PipelineOrchestrator:
         repo_path: str,
         repo_intelligence: Optional[Dict[str, Any]] = None,
         sources_cache: Optional[Dict[str, str]] = None,
+        supporting_context: Optional[Dict[str, Any]] = None,
+        pr_changed_files: Optional[List[str]] = None,
         verbose_ast: bool = False
     ) -> FileReport:
         """Processes a single file through the complete analysis and reasoning pipeline."""
         self.logger.info(f"Processing file: {diff_file.file_path}")
 
+        # Check deleted status or non-python file
+        if diff_file.is_deleted or not diff_file.file_path.endswith(".py"):
+            return FileReport(file_path=diff_file.file_path)
+
+        # Enforce strict PR-analysis scope
+        norm_file_path = DiffParser.normalize_path(diff_file.file_path)
+        if pr_changed_files:
+            norm_pr_set = {DiffParser.normalize_path(p) for p in pr_changed_files if p}
+            if norm_pr_set and norm_file_path not in norm_pr_set:
+                self.logger.info(f"Skipping {diff_file.file_path} — outside PR analysis scope.")
+                return FileReport(file_path=diff_file.file_path)
+
         file_path_abs = os.path.join(repo_path, diff_file.file_path)
 
-        if not os.path.exists(file_path_abs) or not diff_file.file_path.endswith(".py"):
+        if not os.path.exists(file_path_abs):
             return FileReport(file_path=diff_file.file_path)
 
         try:
@@ -197,18 +211,7 @@ class PipelineOrchestrator:
         repo_intel: Dict[str, Any] = repo_intelligence or {}
         if not repo_intel:
             try:
-                sources = sources_cache or {}
-                if not sources and os.path.isdir(repo_path):
-                    for root, _, files in os.walk(repo_path):
-                        for f in files:
-                            if f.endswith(".py"):
-                                full_p = os.path.join(root, f)
-                                rel_p = os.path.relpath(full_p, repo_path).replace("\\", "/")
-                                try:
-                                    with open(full_p, "r", encoding="utf-8") as rf:
-                                        sources[rel_p] = rf.read()
-                                except Exception:
-                                    pass
+                sources = sources_cache or {norm_file_path: code_content}
                 if sources:
                     query_engine = RepositoryQueryEngine(sources=sources, changed_files=[diff_file.file_path])
                     repo_intel = {
@@ -261,10 +264,14 @@ class PipelineOrchestrator:
             dataflow_findings=dataflow_findings,
             repo_intelligence=repo_intel,
             code_content=code_content,
+            pr_changed_files=pr_changed_files,
+            supporting_context=supporting_context,
         )
 
         # 9. Grounded Review Issue Generation with RAG Knowledge
         final_issues = self.review_generator.generate(aggregated)
+        for issue in final_issues:
+            issue.file_path = diff_file.file_path
         self.traces.extend(self.review_generator.traces)
 
         dangerous_patterns_count = sum(

@@ -12,6 +12,8 @@
 *.env.development
 *.env.production
 *.env.test
+**/.env
+**/.env.*
 backend/.env
 backend/.env.*
 frontend/.env
@@ -19,6 +21,9 @@ frontend/.env.*
 
 # Explicitly preserve template / example files
 !.env.example
+!**/.env.example
+!.env.template
+!**/.env.template
 !backend/.env.example
 !frontend/.env.example
 

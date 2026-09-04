@@ -52,6 +52,18 @@ async def log_requests(request: Request, call_next):
     )
     return response
 
+from fastapi.responses import JSONResponse
+from app.core.logger import mask_secrets
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    sanitized_msg = mask_secrets(str(exc))
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {sanitized_msg}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error occurred."}
+    )
+
 app.include_router(review_router)
 
 @app.get("/health", tags=["System"])

@@ -9,6 +9,7 @@ from app.static_analysis.prioritization import PrioritizationEngine
 from app.analysis.RAG.knowledge_retrieval_service import KnowledgeRetrievalService
 from app.core.config import get_settings
 from app.llm.llm_budget import get_review_tracker
+from app.diff.diff_parser import DiffParser
 
 
 class ReviewGenerator:
@@ -32,6 +33,16 @@ class ReviewGenerator:
         """
         Runs the deterministic finding pipeline: collect -> deduplicate -> prioritize -> select -> reason.
         """
+        # PR Scope Safety Check (Requirement 8): finding.file_path ∈ PR_CHANGED_FILES
+        file_path = aggregated.get("file_path", "")
+        pr_changed_files = aggregated.get("pr_changed_files", [])
+        if pr_changed_files:
+            norm_pr_files = {DiffParser.normalize_path(p) for p in pr_changed_files if p}
+            norm_fp = DiffParser.normalize_path(file_path)
+            if norm_pr_files and norm_fp not in norm_pr_files:
+                # File is supporting context only, never expose as reportable PR findings
+                return []
+
         # ═══════════════════════════════════════════════════════════════
         # PHASE A — COLLECTION: Collect all raw findings from all analyzers
         # ═══════════════════════════════════════════════════════════════
@@ -133,8 +144,15 @@ class ReviewGenerator:
     # ═══════════════════════════════════════════════════════════════════
 
     def _collect_all_raw_findings(self, aggregated: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Collect ALL raw deterministic findings from all static analyzers into a flat list."""
+        """Collect ALL raw deterministic findings from all static analyzers into a flat list, strictly PR-scoped."""
         raw_list: List[Dict[str, Any]] = []
+        file_path = DiffParser.normalize_path(aggregated.get("file_path", ""))
+        pr_changed_files = aggregated.get("pr_changed_files", [])
+        norm_pr_files = {DiffParser.normalize_path(p) for p in pr_changed_files if p} if pr_changed_files else set()
+
+        if norm_pr_files and file_path not in norm_pr_files:
+            return []
+
         changed_lines_set = set(aggregated.get("changed_lines", []))
 
         # 1. Gather AST Mutation Detections
@@ -147,6 +165,7 @@ class ReviewGenerator:
             msg = item.get("message", "List mutation during iteration")
             raw_list.append({
                 "line": line,
+                "file_path": file_path,
                 "issue": msg,
                 "severity": "high" if "shared" in pattern else "critical",
                 "issue_type": "runtime_logic_error",
@@ -172,6 +191,7 @@ class ReviewGenerator:
             strength = 0.3 if "shadow" in pattern else 0.7
             raw_list.append({
                 "line": line,
+                "file_path": file_path,
                 "issue": msg,
                 "severity": "medium",
                 "issue_type": "code_smell",
@@ -196,6 +216,7 @@ class ReviewGenerator:
             msg = item.get("message", "Async issue")
             raw_list.append({
                 "line": line,
+                "file_path": file_path,
                 "issue": msg,
                 "severity": "high",
                 "issue_type": "concurrency",
@@ -222,6 +243,7 @@ class ReviewGenerator:
             issue_type = "security" if any(k in rule_name for k in ("eval", "exec", "subprocess", "pickle")) else "runtime_logic_error"
             raw_list.append({
                 "line": line,
+                "file_path": file_path,
                 "issue": msg,
                 "severity": sev,
                 "issue_type": issue_type,
@@ -257,6 +279,7 @@ class ReviewGenerator:
             rule_obj = {"tool": tool, "rule_id": rule, "line": line, "message": msg}
             raw_list.append({
                 "line": line,
+                "file_path": file_path,
                 "issue": msg,
                 "severity": sev,
                 "issue_type": issue_type,
@@ -282,6 +305,7 @@ class ReviewGenerator:
             strength = item.get("evidence_strength", 0.8)
             raw_list.append({
                 "line": line,
+                "file_path": file_path,
                 "issue": msg,
                 "severity": sev,
                 "issue_type": issue_type,
@@ -304,6 +328,9 @@ class ReviewGenerator:
         for df in dataflow_analysis:
             if not isinstance(df, dict):
                 continue
+            df_file = DiffParser.normalize_path(df.get("sink_file") or df.get("file_path") or file_path)
+            if norm_pr_files and df_file not in norm_pr_files:
+                continue
             line = df.get("sink_line") or df.get("source_line") or 1
             if changed_lines_set and line not in changed_lines_set:
                 continue
@@ -322,6 +349,7 @@ class ReviewGenerator:
             }
             raw_list.append({
                 "line": line,
+                "file_path": file_path,
                 "issue": f"{title}: {desc}",
                 "severity": sev,
                 "issue_type": "security",
@@ -333,6 +361,13 @@ class ReviewGenerator:
                     "trigger_lines": [line]
                 }
             })
+
+        # Final safety filter: guarantee finding.file_path in PR_CHANGED_FILES
+        if norm_pr_files:
+            raw_list = [
+                f for f in raw_list
+                if DiffParser.normalize_path(f.get("file_path", "")) in norm_pr_files
+            ]
 
         return raw_list
 
@@ -589,7 +624,8 @@ class ReviewGenerator:
         return self._build_review_issue(
             line, finding, evidence_strength, primary_source, primary_rule, primary_msg,
             priority_info, conf_details, is_changed, ai_details, reasoning_source,
-            reasoning_activated, knowledge_sources, changed_lines_set, threshold
+            reasoning_activated, knowledge_sources, changed_lines_set, threshold,
+            file_path=ef.get("file_path")
         )
 
     def _process_finding_static(
@@ -617,7 +653,8 @@ class ReviewGenerator:
         return self._build_review_issue(
             line, finding, evidence_strength, primary_source, primary_rule, primary_msg,
             priority_info, conf_details, is_changed, ai_details, reasoning_source,
-            reasoning_activated, [], changed_lines_set, threshold
+            reasoning_activated, [], changed_lines_set, threshold,
+            file_path=ef.get("file_path")
         )
 
     def _build_review_issue(
@@ -637,6 +674,7 @@ class ReviewGenerator:
         knowledge_sources: List[str],
         changed_lines_set: set,
         threshold: float,
+        file_path: Optional[str] = None,
     ) -> ReviewIssue:
         """Build a ReviewIssue from all computed data."""
         # Priority score calculation
@@ -682,6 +720,7 @@ class ReviewGenerator:
 
         return ReviewIssue(
             line=line,
+            file_path=file_path or finding.get("file_path"),
             severity=finding.get("severity", "medium"),
             confidence=conf_details["confidence"],
             issue=finding.get("issue", ""),

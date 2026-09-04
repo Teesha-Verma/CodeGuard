@@ -62,6 +62,65 @@ CodeGuard V2 is an enterprise-grade hybrid AI code review engine that combines d
 
 ---
 
+## 2. PR-Scoped Analysis & Context Isolation
+
+CodeGuard V2 enforces strict **PR-scoped analysis** to optimize review latency, static analysis overhead, and LLM/RAG token consumption:
+
+```
+GitHub Pull Request (Authoritative Changed Files)
+                 │
+                 ▼
+      PR_ANALYSIS_SCOPE: Exact PR Files
+       (added, modified, renamed new-path)
+      (removed files skipped from active AST)
+                 │
+        ┌────────┴────────────────────────┐
+        ▼                                 ▼
+Primary PR Static Analysis       Need Local Context?
+ (AST, Flake8, PyLint, Bandit)             │
+        │                                 ▼
+        │                    SUPPORTING_CONTEXT_SCOPE:
+        │                    Targeted Local Imports & Symbols
+        │                    (bounded to referenced modules only)
+        │                                 │
+        ▼                                 ▼
+   PR-Scoped Findings ◄── Filter ── Non-PR Repository Code Excluded
+        │                 (finding.file_path ∈ PR_CHANGED_FILES)
+        ▼
+PR Review Report & LLM Reasoning
+```
+
+### Key Architectural Principles:
+1. **Exact Path Matching**: Review scope is governed strictly by normalized repository-relative paths (e.g. `src/utils/parser.py`). Basename, suffix, or fuzzy matching (`tests/utils/parser.py`, `legacy/parser.py`) is strictly eliminated.
+2. **File Status Semantics**:
+   - `added` / `modified`: Analyzed as active primary files.
+   - `renamed`: Analyzed using the new destination path.
+   - `removed`: Explicitly skipped from source AST analysis to prevent missing file errors.
+3. **Primary vs. Supporting Context Scope**:
+   - `PR_ANALYSIS_SCOPE`: Only files directly touched in the PR receive full static analysis (AST, CFG, linters, taint analysis).
+   - `SUPPORTING_CONTEXT_SCOPE`: Bounded local dependencies (imported modules, base classes, called functions) are inspected solely to resolve cross-file symbol context for primary files.
+   - Repository-wide files are **never** mass-analyzed, and issues in supporting context are **never** reported as PR findings.
+4. **Hard Finding Filtering**: Before entering `ReviewGenerator`, every finding is validated against `finding.file_path ∈ PR_CHANGED_FILES`. Any finding outside the PR change set is dropped from the report.
+5. **PR-Scoped Style Warnings**: Linters (Flake8, PyLint) only report violations on the PR's changed files, eliminating noisy repository-wide formatting warnings.
+6. **Token & Performance Optimization**: RAG vector retrieval and LLM context construction only include PR changed hunks and localized supporting symbols (capped at ±50 lines), drastically reducing Groq and Gemini token expenditure.
+
+---
+
+## 3. Secret Protection & Repository Hygiene
+
+To safeguard credentials and prevent accidental data leakage:
+1. **Strict Git Ignore Rules**:
+   - `.env`, `.env.*`, `**/.env`, `**/.env.*`, `*.key`, `*.pem`, `*.crt`, `*.pfx` are globally ignored across all directories.
+   - `.env.example` and `**/.env.example` are explicitly tracked and contain **placeholders only**.
+2. **Never Commit Secrets**: Real credentials (API keys, connection strings, auth tokens) must reside exclusively in uncommitted `.env` files or secure environment variables.
+3. **Secret-Safe Logging**: The logging system employs centralized regex redaction (`mask_secrets`) to sanitize Groq keys, Gemini keys, GitHub tokens, Bearer authorization headers, and database connection strings before writing to console or disk.
+4. **Sanitized Error Responses**: API 500 error handlers sanitize exception messages and tracebacks, preventing database URLs or secrets from leaking to clients.
+5. **Credential Rotation Notice**:
+   > [!WARNING]
+   > Historical Git commit `48ad88de8516818443ca99ea2882c5c91daaf70e` committed an API key to `backend/.env.example`. Any credentials committed in historical commits must be immediately revoked and rotated at the provider dashboard. Git ignore alone does not revoke previously committed secrets.
+
+---
+
 ## 2. Core Subsystems
 
 ### 2.1. Two-Phase Review Generator & Deterministic LLM Selection
