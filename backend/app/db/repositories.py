@@ -110,3 +110,24 @@ class ReviewRepository:
             self.db.rollback()
             raise
         return trace
+
+    def list_reviews(self, limit: int = 50, offset: int = 0) -> list[Review]:
+        return (
+            self.db.query(Review)
+            .order_by(Review.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+    def delete_review(self, review_id: str) -> bool:
+        review = self.db.query(Review).filter(Review.id == review_id).first()
+        if review:
+            try:
+                self.db.delete(review)
+                self.db.commit()
+                return True
+            except Exception:
+                self.db.rollback()
+                raise
+        return False

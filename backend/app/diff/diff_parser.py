@@ -33,7 +33,20 @@ class DiffParser:
     
     HUNK_PATTERN = re.compile(r"@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@")
 
-    def parse(self, diff_text: str) -> List[DiffFile]:
+    @staticmethod
+    def normalize_path(p: str) -> str:
+        """Normalize repository-relative path with forward slashes and no leading artifacts."""
+        if not p:
+            return ""
+        cleaned = p.strip().replace("\\", "/")
+        if cleaned.startswith("a/") or cleaned.startswith("b/"):
+            cleaned = cleaned[2:]
+        while cleaned.startswith("./"):
+            cleaned = cleaned[2:]
+        return cleaned.lstrip("/")
+
+    @classmethod
+    def parse(cls, diff_text: str) -> List[DiffFile]:
         files: List[DiffFile] = []
         current_file: Optional[DiffFile] = None
         current_hunk: Optional[DiffHunk] = None
@@ -47,11 +60,14 @@ class DiffParser:
                     files.append(current_file)
                 
                 parts = line.split(" ")
-                old_path = parts[-2].replace("a/", "", 1)
-                new_path = parts[-1].replace("b/", "", 1)
+                old_raw = parts[-2] if len(parts) >= 3 else ""
+                new_raw = parts[-1] if len(parts) >= 3 else ""
+                
+                old_path = cls.normalize_path(old_raw)
+                new_path = cls.normalize_path(new_raw)
                 
                 current_file = DiffFile(file_path=new_path, old_file_path=old_path)
-                if old_path != new_path:
+                if old_path and new_path and old_path != new_path:
                     current_file.is_rename = True
                 current_hunk = None
 
@@ -61,9 +77,23 @@ class DiffParser:
             elif line.startswith("deleted file mode"):
                 if current_file:
                     current_file.is_deleted = True
+            elif line.startswith("rename from "):
+                if current_file:
+                    current_file.is_rename = True
+                    current_file.old_file_path = cls.normalize_path(line[len("rename from "):])
+            elif line.startswith("rename to "):
+                if current_file:
+                    current_file.is_rename = True
+                    current_file.file_path = cls.normalize_path(line[len("rename to "):])
+            elif line.startswith("--- ") and line.strip() == "--- /dev/null":
+                if current_file:
+                    current_file.is_new = True
+            elif line.startswith("+++ ") and line.strip() == "+++ /dev/null":
+                if current_file:
+                    current_file.is_deleted = True
             
             elif line.startswith("@@"):
-                match = self.HUNK_PATTERN.search(line)
+                match = cls.HUNK_PATTERN.search(line)
                 if match and current_file:
                     old_start = int(match.group(1))
                     old_lines = int(match.group(2)) if match.group(2) else 1

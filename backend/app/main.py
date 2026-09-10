@@ -3,6 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router as review_router
+from app.api.assistant_routes import router as assistant_router
+from app.api.learner_routes import router as learner_router
+from app.api.security_routes import router as security_router
+from app.api.knowledge_routes import router as knowledge_router
 from app.core.logger import get_logger
 from app.core.config import get_settings
 from app.db.database import engine, Base
@@ -26,10 +30,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS configuration
+# CORS configuration: support local Vite frontend and environment-configured origins
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins if not getattr(settings, "DEBUG", True) else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,7 +65,23 @@ async def log_requests(request: Request, call_next):
     )
     return response
 
+from fastapi.responses import JSONResponse
+from app.core.logger import mask_secrets
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    sanitized_msg = mask_secrets(str(exc))
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {sanitized_msg}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error occurred."}
+    )
+
 app.include_router(review_router)
+app.include_router(assistant_router)
+app.include_router(learner_router)
+app.include_router(security_router)
+app.include_router(knowledge_router)
 
 @app.get("/health", tags=["System"])
 def health_check():

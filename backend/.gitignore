@@ -1,0 +1,43 @@
+# CodeGuard Backend — Local and Secret Protection .gitignore
+
+# Environment and secrets
+.env
+.env.*
+*.env
+*.env.local
+*.env.development
+*.env.production
+*.env.test
+!.env.example
+!.env.template
+
+# Security credentials and keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+credentials.json
+secrets.json
+service_account.json
+token.json
+
+# Python & Virtual Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases and repos
+*.db
+*.sqlite
+*.sqlite3
+repos/
+logs/
+data/reviews/
