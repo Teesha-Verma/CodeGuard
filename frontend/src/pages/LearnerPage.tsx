@@ -26,11 +26,13 @@ export default function LearnerPage() {
 
   // Flatten all issues from the selected review
   const allReviewIssues: { filePath: string; issue: ReviewIssue }[] = [];
-  if (currentReview) {
+  if (currentReview && Array.isArray(currentReview.file_reports)) {
     currentReview.file_reports.forEach((f) => {
-      f.issues.forEach((iss) => {
-        allReviewIssues.push({ filePath: f.file_path, issue: iss });
-      });
+      if (Array.isArray(f?.issues)) {
+        f.issues.forEach((iss) => {
+          allReviewIssues.push({ filePath: f.file_path, issue: iss });
+        });
+      }
     });
   }
 

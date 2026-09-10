@@ -103,8 +103,16 @@ export interface ReviewReport {
 
 export interface ReviewStatusResponse {
   review_id: string;
-  status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled' | string;
-  message: string;
+  status: 'started' | 'running' | 'processing' | 'queued' | 'completed' | 'failed' | 'cancelled' | 'timed_out' | string;
+  message?: string;
+  stage?: string;
+  error_code?: string;
+  error_message?: string;
+  failed_stage?: string;
+  duration_seconds?: number;
+  started_at?: string;
+  updated_at?: string;
+  progress_percent?: number;
 }
 
 export interface StoredReviewRecord {

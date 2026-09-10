@@ -81,7 +81,37 @@ export const FixPlaygroundView: React.FC = () => {
     setAnalysisResult({ status: 'idle', message: '' });
 
     try {
-      // 1. Submit snippet review to real backend API
+      // 1. Try rapid synchronous static & AST re-analysis endpoint
+      try {
+        setAnalysisStatus('Executing static AST rules & taint verifier...');
+        const playResp = await apiClient.testPlayground({
+          code: editableCode,
+          language: 'python',
+          filename: activeFilePath || 'snippet.py',
+          original_finding_line: activeIssue?.line,
+          original_issue_category: activeIssue?.category || activeIssue?.issue_type,
+        });
+
+        if (playResp.status === 'resolved' || playResp.is_resolved) {
+          setAnalysisResult({
+            status: 'resolved',
+            message: playResp.message || 'Issue Resolved: AST & taint analysis confirms vulnerability is eliminated.',
+            newIssues: playResp.findings as ReviewIssue[],
+          });
+        } else {
+          setAnalysisResult({
+            status: 'still_detected',
+            message: playResp.message || `Issue Still Detected: ${playResp.findings?.length || 1} risk(s) remain in modified code.`,
+            newIssues: playResp.findings as ReviewIssue[],
+          });
+        }
+        setIsAnalyzing(false);
+        return;
+      } catch {
+        // Fall back to full pipeline snippet review submission
+      }
+
+      // 2. Submit snippet review to real backend API
       const response = await apiClient.submitSnippetReview(
         editableCode,
         'python',
@@ -134,7 +164,9 @@ export const FixPlaygroundView: React.FC = () => {
       }
 
       // 3. Compare findings from the new report
-      const newFindings = finalReport.file_reports.flatMap((f) => f.issues);
+      const newFindings = Array.isArray(finalReport?.file_reports)
+        ? finalReport.file_reports.flatMap((f) => (Array.isArray(f?.issues) ? f.issues : []))
+        : [];
       const isStillPresent = newFindings.some(
         (f) =>
           f.issue.toLowerCase().includes(activeIssue?.category?.toLowerCase() || '') ||

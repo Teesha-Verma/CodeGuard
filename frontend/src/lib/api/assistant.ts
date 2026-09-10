@@ -1,3 +1,4 @@
+import { apiClient } from './client';
 import { ReviewIssue, ReviewReport } from '@/types';
 
 export interface ChatMessage {
@@ -17,8 +18,8 @@ export interface AssistantQueryOptions {
 
 /**
  * Assistant service adapter.
- * Generates grounded, contextual responses using the real AST/taint/reasoning data attached to the review.
- * Prepared for clean integration with a future FastAPI `/assistant/chat` endpoint.
+ * Communicates with FastAPI `/assistant/chat` (Groq primary -> Gemini fallback),
+ * with graceful deterministic local fallback if backend is offline.
  */
 export async function queryAssistant({
   query,
@@ -26,6 +27,24 @@ export async function queryAssistant({
   filePath,
   report,
 }: AssistantQueryOptions): Promise<string> {
+  // 1. Attempt real backend assistant call
+  try {
+    const apiResp = await apiClient.chatAssistant({
+      messages: [{ role: 'user', content: query }],
+      review_id: report?.review_id,
+      file_path: filePath,
+      line: issue?.line,
+      finding_line: issue?.line,
+      context: report?.repo_url ? `Repository: ${report.repo_url}` : undefined,
+    });
+    const reply = apiResp.reply || apiResp.message;
+    if (reply && reply.trim()) {
+      return reply.trim();
+    }
+  } catch {
+    // Fall back to local contextual heuristics if backend is unreachable
+  }
+
   const normQuery = query.toLowerCase().trim();
 
   // If no finding is attached
@@ -80,7 +99,7 @@ export async function queryAssistant({
     if (issue.dataflow_path && issue.dataflow_path.length > 0) {
       let resp = `### Taint Propagation Path\n\n`;
       resp += `CodeGuard detected an unbroken source-to-sink dataflow trace:\n\n`;
-      issue.dataflow_path.forEach((step, idx) => {
+      issue.dataflow_path.forEach((step: string, idx: number) => {
         const role =
           idx === 0 ? '(Taint Source)' : idx === issue.dataflow_path!.length - 1 ? '(Dangerous Sink)' : '(Propagation)';
         resp += `${idx + 1}. \`${step}\` ${role}\n`;

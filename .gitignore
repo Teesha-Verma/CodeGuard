@@ -232,6 +232,12 @@ cover/
 *.cer
 *.p12
 *.pfx
+*.p8
+*.pkcs12
+*.der
+*.keystore
+*.jks
+*.kdbx
 
 credentials.json
 credentials.yaml
@@ -240,10 +246,32 @@ credentials.yml
 secrets.json
 secrets.yaml
 secrets.yml
+*.secret
+*.secrets
 
-service-account.json
-service_account.json
+service-account*.json
+service_account*.json
 token.json
+client_secret*.json
+google-services.json
+auth.json
+
+# SSH & Private Keys
+id_rsa
+id_rsa*
+id_ed25519
+id_ed25519*
+id_ecdsa
+id_ecdsa*
+id_dsa
+id_dsa*
+
+# Cloud & Tooling Auth / State
+.netrc
+*.tfvars
+*.tfvars.json
+stripe_*.key
+
 
 # ============================================================
 # OS FILES

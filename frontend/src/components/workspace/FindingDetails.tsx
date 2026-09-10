@@ -125,7 +125,7 @@ export const FindingDetails: React.FC<FindingDetailsProps> = ({
             <span>Fix This</span>
           </button>
 
-          {issue.dataflow_path && issue.dataflow_path.length > 0 && (
+          {(report?.review_id || (issue.dataflow_path && issue.dataflow_path.length > 0)) && (
             <button
               type="button"
               onClick={() => {

@@ -20,6 +20,7 @@ export default function PRReviewPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError(null);
 
     if (!repoUrl.trim()) {

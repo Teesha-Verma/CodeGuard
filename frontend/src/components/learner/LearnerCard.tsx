@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReviewIssue } from '@/types';
 import { SeverityBadge } from '@/components/common/Badges';
 import { MiniQuiz } from '@/components/learner/MiniQuiz';
 import { getTopicByCwe, SECURITY_TOPICS } from '@/lib/data/securityKnowledge';
+import { apiClient, LearnerFindingResponse } from '@/lib/api/client';
 import {
   BookOpen,
   AlertTriangle,
@@ -14,6 +15,7 @@ import {
   Terminal,
   Cpu,
   BookmarkCheck,
+  Sparkles,
 } from 'lucide-react';
 
 interface LearnerCardProps {
@@ -31,6 +33,31 @@ export const LearnerCard: React.FC<LearnerCardProps> = ({
   onShowDataflow,
   onAskAssistant,
 }) => {
+  const [backendLesson, setBackendLesson] = useState<LearnerFindingResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .learnFinding({
+        file_path: filePath,
+        line: issue.line,
+        issue_text: issue.issue,
+        category: issue.category,
+      })
+      .then((data) => {
+        if (!cancelled && data) {
+          setBackendLesson(data);
+        }
+      })
+      .catch(() => {
+        // Fall back gracefully to local curriculum
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filePath, issue.line, issue.issue]);
+
   // Find associated topic by CWE or keyword
   const cwe = issue.standards?.[0] || issue.issue || 'sql-injection';
   const topic =
@@ -41,6 +68,15 @@ export const LearnerCard: React.FC<LearnerCardProps> = ({
       issue.issue.toLowerCase().includes('command')
     ) ||
     SECURITY_TOPICS[0];
+
+  const activeQuiz = backendLesson?.quiz
+    ? {
+        question: backendLesson.quiz.question,
+        options: backendLesson.quiz.options,
+        correctIndex: backendLesson.quiz.correct_index ?? backendLesson.quiz.correct_option ?? 0,
+        explanation: backendLesson.quiz.explanation,
+      }
+    : topic.quiz;
 
   return (
     <div className="space-y-6">
@@ -102,17 +138,23 @@ export const LearnerCard: React.FC<LearnerCardProps> = ({
                 1. The Security Concept
               </h3>
             </div>
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              {topic.title}
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-1.5">
+              <span>{backendLesson?.concept_title || topic.title}</span>
+              {backendLesson && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  AI Grounded
+                </span>
+              )}
             </h4>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              {topic.summary}
+              {backendLesson?.concept_summary || topic.summary}
             </p>
             <div className="mt-4 p-3 rounded bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300">
               <span className="font-semibold block mb-1 text-[11px] font-mono text-slate-500">
                 WHY IT MATTERS
               </span>
-              <p className="text-[11.5px] leading-relaxed">{topic.whyItMatters}</p>
+              <p className="text-[11.5px] leading-relaxed">{backendLesson?.why_it_matters || topic.whyItMatters}</p>
             </div>
           </div>
         </div>
@@ -130,16 +172,17 @@ export const LearnerCard: React.FC<LearnerCardProps> = ({
               Specific Root Cause Breakdown
             </h4>
             <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3 rounded-md">
-              {issue.root_cause ||
+              {backendLesson?.what_happened_in_code ||
+                issue.root_cause ||
                 'Unvalidated input flows directly into sensitive execution logic without safe parameterization.'}
             </p>
 
-            {issue.impact && (
+            {(backendLesson?.impact || issue.impact) && (
               <div className="mt-3 p-3 rounded bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300">
                 <span className="font-semibold block mb-0.5 text-[11px] font-mono text-slate-500">
                   REAL-WORLD IMPACT
                 </span>
-                <p className="text-[11.5px] leading-relaxed">{issue.impact}</p>
+                <p className="text-[11.5px] leading-relaxed">{backendLesson?.impact || issue.impact}</p>
               </div>
             )}
           </div>
@@ -236,7 +279,7 @@ export const LearnerCard: React.FC<LearnerCardProps> = ({
         </div>
 
         <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-          {issue.fix || topic.preventiveGuidelines[0]}
+          {backendLesson?.safer_implementation || issue.fix || topic.preventiveGuidelines[0]}
         </p>
 
         {issue.patch ? (
@@ -281,7 +324,10 @@ export const LearnerCard: React.FC<LearnerCardProps> = ({
         </div>
 
         <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
-          {topic.preventiveGuidelines.map((guide, gidx) => (
+          {(backendLesson?.key_takeaways && backendLesson.key_takeaways.length > 0
+            ? backendLesson.key_takeaways
+            : topic.preventiveGuidelines
+          ).map((guide: string, gidx: number) => (
             <li key={gidx} className="flex items-start gap-2.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{guide}</span>
@@ -291,7 +337,7 @@ export const LearnerCard: React.FC<LearnerCardProps> = ({
       </div>
 
       {/* Module 6: Interactive Knowledge Check Quiz */}
-      <MiniQuiz quiz={topic.quiz} />
+      <MiniQuiz quiz={activeQuiz} />
     </div>
   );
 };

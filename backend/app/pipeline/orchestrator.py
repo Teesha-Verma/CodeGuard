@@ -307,5 +307,6 @@ class PipelineOrchestrator:
                 "message": f.message,
                 "line": f.line,
                 "tool": f.tool_name
-            } for f in relevant_linters]
+            } for f in relevant_linters],
+            file_content=code_content
         )

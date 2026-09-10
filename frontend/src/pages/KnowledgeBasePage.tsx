@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { SECURITY_TOPICS } from '@/lib/data/securityKnowledge';
+import { apiClient } from '@/lib/api/client';
 import {
   BookOpen,
   Search,
@@ -10,20 +11,62 @@ import {
   AlertTriangle,
   GraduationCap,
   Code2,
+  Sparkles,
 } from 'lucide-react';
 
 export default function KnowledgeBasePage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [topics, setTopics] = useState(SECURITY_TOPICS);
 
   useEffect(() => {
     document.title = 'Security Knowledge Base — CodeGuard V2';
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getKnowledgeTopics({
+        category: selectedCategory !== 'ALL' ? selectedCategory : undefined,
+        query: searchQuery || undefined,
+      })
+      .then((topicList) => {
+        if (!cancelled && Array.isArray(topicList) && topicList.length > 0) {
+          const remoteList = topicList.map((rt) => {
+            const localMatch = SECURITY_TOPICS.find((st) => st.id === rt.id || st.cwe === rt.cwe);
+            return (
+              localMatch || {
+                id: rt.id,
+                title: rt.title,
+                cwe: rt.cwe,
+                owasp: rt.owasp,
+                category: rt.category as any,
+                severity: rt.severity as any,
+                summary: rt.summary,
+                whyItMatters: '',
+                mechanics: '',
+                vulnerableExample: '',
+                secureExample: '',
+                preventiveGuidelines: [] as string[],
+                codeguardDetection: { astRule: '', taintBehavior: '', reasoningPattern: '' },
+                quiz: { question: '', options: [] as string[], correctIndex: 0, explanation: '' },
+              }
+            );
+          });
+          setTopics(remoteList);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, selectedCategory]);
+
   const categories = ['ALL', 'Injection', 'Authentication', 'Memory & Deserialization', 'Network', 'Data Protection', 'Configuration'];
 
-  const filteredTopics = SECURITY_TOPICS.filter((t) => {
+  const filteredTopics = topics.filter((t) => {
     if (selectedCategory !== 'ALL' && t.category !== selectedCategory) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();

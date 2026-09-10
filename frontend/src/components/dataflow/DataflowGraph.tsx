@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReviewIssue } from '@/types';
+import { apiClient, DataflowNode } from '@/lib/api/client';
 import { SeverityBadge } from '@/components/common/Badges';
 import {
   ArrowDown,
@@ -11,12 +12,14 @@ import {
   CheckCircle2,
   Info,
   Layers,
+  Sparkles,
 } from 'lucide-react';
 
 interface DataflowGraphProps {
   issue: ReviewIssue | null;
   filePath: string;
   fileContent?: string;
+  reviewId?: string;
   onFixInPlayground?: () => void;
 }
 
@@ -34,9 +37,28 @@ export const DataflowGraph: React.FC<DataflowGraphProps> = ({
   issue,
   filePath,
   fileContent,
+  reviewId,
   onFixInPlayground,
 }) => {
   const [selectedNodeIndex, setSelectedNodeIndex] = useState<number>(0);
+  const [backendNodes, setBackendNodes] = useState<DataflowNode[] | null>(null);
+
+  useEffect(() => {
+    if (!reviewId || !issue?.line) return;
+    let cancelled = false;
+    apiClient
+      .getFindingDataflow(reviewId, issue.line)
+      .then((res) => {
+        if (!cancelled && res?.available && res.nodes?.length) {
+          setBackendNodes(res.nodes);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reviewId, issue?.line]);
 
   if (!issue) {
     return (
@@ -52,8 +74,10 @@ export const DataflowGraph: React.FC<DataflowGraphProps> = ({
     );
   }
 
-  // Check if dataflow_path exists and is populated
-  const hasDataflow = issue.dataflow_path && issue.dataflow_path.length > 0;
+  // Check if dataflow_path exists or backendNodes exists
+  const hasDataflow =
+    (backendNodes && backendNodes.length > 0) ||
+    (issue.dataflow_path && issue.dataflow_path.length > 0);
 
   if (!hasDataflow) {
     return (
@@ -75,36 +99,51 @@ export const DataflowGraph: React.FC<DataflowGraphProps> = ({
     );
   }
 
-  const rawPath = issue.dataflow_path!;
+  // Generate structured nodes from backendNodes or dataflow_path
+  const nodes: FlowNode[] =
+    backendNodes && backendNodes.length > 0
+      ? backendNodes.map((bn, idx) => ({
+          id: `node-${idx}`,
+          stepNumber: idx + 1,
+          label: `${bn.symbol} (${bn.operation})`,
+          role: (bn.role?.toUpperCase() ||
+            (idx === 0 ? 'SOURCE' : idx === backendNodes.length - 1 ? 'SINK' : 'PROPAGATION')) as any,
+          description: `Taint ${bn.operation} involving '${bn.symbol}' at line ${bn.line} in ${bn.file}.`,
+          codeSnippet: `${bn.symbol} [${bn.operation}]`,
+          lineOffset: bn.line,
+        }))
+      : (issue.dataflow_path || []).map((step, idx) => {
+          let role: FlowNode['role'] = 'PROPAGATION';
+          let desc = 'Data propagates through internal variable reference.';
 
-  // Generate structured nodes from dataflow_path
-  const nodes: FlowNode[] = rawPath.map((step, idx) => {
-    let role: FlowNode['role'] = 'PROPAGATION';
-    let desc = 'Data propagates through internal variable reference.';
+          if (idx === 0) {
+            role = 'SOURCE';
+            desc = 'Untrusted input enters the application boundary from an external request parameter.';
+          } else if (idx === 1) {
+            role = 'INPUT';
+            desc = 'External value is assigned to a local parameter without sanitization or type constraint.';
+          } else if (idx === (issue.dataflow_path?.length || 1) - 1) {
+            role = 'SINK';
+            desc = 'Tainted string reaches sensitive execution sink where it alters control flow or query syntax.';
+          } else if (
+            step.includes('format') ||
+            step.includes('f"') ||
+            step.includes('concat') ||
+            step.includes('+')
+          ) {
+            role = 'TRANSFORMATION';
+            desc = 'String interpolation or dynamic construction incorporates untrusted value into execution buffer.';
+          }
 
-    if (idx === 0) {
-      role = 'SOURCE';
-      desc = 'Untrusted input enters the application boundary from an external request parameter.';
-    } else if (idx === 1) {
-      role = 'INPUT';
-      desc = 'External value is assigned to a local parameter without sanitization or type constraint.';
-    } else if (idx === rawPath.length - 1) {
-      role = 'SINK';
-      desc = 'Tainted string reaches sensitive execution sink where it alters control flow or query syntax.';
-    } else if (step.includes('format') || step.includes('f"') || step.includes('concat') || step.includes('+')) {
-      role = 'TRANSFORMATION';
-      desc = 'String interpolation or dynamic construction incorporates untrusted value into execution buffer.';
-    }
-
-    return {
-      id: `node-${idx}`,
-      stepNumber: idx + 1,
-      label: step,
-      role,
-      description: desc,
-      codeSnippet: step,
-    };
-  });
+          return {
+            id: `node-${idx}`,
+            stepNumber: idx + 1,
+            label: step,
+            role,
+            description: desc,
+            codeSnippet: step,
+          };
+        });
 
   const selectedNode = nodes[selectedNodeIndex] || nodes[0];
 

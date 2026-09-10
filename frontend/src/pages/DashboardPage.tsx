@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { getStoredReviews } from '@/lib/storage/reviews';
+import { apiClient, DashboardStatsResponse } from '@/lib/api/client';
 import { StoredReviewRecord } from '@/types';
 import { StatusBadge } from '@/components/common/Badges';
 import {
@@ -18,24 +19,70 @@ import {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [reviews, setReviews] = useState<StoredReviewRecord[]>([]);
+  const [stats, setStats] = useState<DashboardStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadReviews = () => {
+  const loadReviews = async () => {
     setLoading(true);
-    const data = getStoredReviews();
-    setReviews(data);
-    setLoading(false);
+    const local = getStoredReviews();
+    setReviews(local);
+
+    try {
+      const [backendStats, remoteReviews] = await Promise.allSettled([
+        apiClient.getDashboardStats(),
+        apiClient.listReviews(),
+      ]);
+
+      if (backendStats.status === 'fulfilled' && backendStats.value) {
+        setStats(backendStats.value);
+      }
+
+      if (remoteReviews.status === 'fulfilled' && remoteReviews.value?.reviews) {
+        const map = new Map<string, StoredReviewRecord>();
+        local.forEach((r) => map.set(r.review_id, r));
+        remoteReviews.value.reviews.forEach((r) =>
+          map.set(r.review_id, {
+            review_id: r.review_id,
+            type: r.type,
+            repo_url: r.repo_url,
+            pr_number: r.pr_number,
+            filename: r.filename,
+            language: r.language,
+            status: (r.status === 'completed'
+              ? 'completed'
+              : r.status === 'failed' || r.status === 'cancelled'
+              ? 'failed'
+              : r.status === 'queued'
+              ? 'queued'
+              : 'running') as 'running' | 'completed' | 'failed' | 'queued',
+            created_at: r.created_at,
+            duration_seconds: r.duration_seconds,
+            total_issues: r.total_issues,
+            critical_issues: r.critical_issues,
+            high_issues: r.high_issues,
+          })
+        );
+        const merged = Array.from(map.values()).sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setReviews(merged);
+      }
+    } catch {
+      // Keep local data
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadReviews();
   }, []);
 
-  // Compute metrics from actual stored review data
-  const totalReviews = reviews.length;
-  const completedReviews = reviews.filter((r) => r.status === 'completed').length;
-  const totalIssuesFound = reviews.reduce((sum, r) => sum + (r.total_issues || 0), 0);
-  const criticalHighIssues = reviews.reduce(
+  // Compute metrics from actual stored review data with server authoritative fallback
+  const totalReviews = stats?.total_reviews ?? reviews.length;
+  const completedReviews = stats?.completed_reviews ?? reviews.filter((r) => r.status === 'completed').length;
+  const totalIssuesFound = stats?.total_issues ?? reviews.reduce((sum, r) => sum + (r.total_issues || 0), 0);
+  const criticalHighIssues = stats?.critical_high_issues ?? reviews.reduce(
     (sum, r) => sum + (r.critical_issues || 0) + (r.high_issues || 0),
     0
   );

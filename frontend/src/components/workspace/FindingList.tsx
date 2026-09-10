@@ -27,8 +27,10 @@ export const FindingList: React.FC<FindingListProps> = ({
   const items = useMemo(() => {
     const list: Array<{ filePath: string; issue: ReviewIssue }> = [];
 
-    report.file_reports.forEach((fr) => {
-      fr.issues.forEach((iss) => {
+    if (Array.isArray(report?.file_reports)) {
+      report.file_reports.forEach((fr) => {
+        if (Array.isArray(fr?.issues)) {
+          fr.issues.forEach((iss) => {
         const isLowSignal =
           iss.issue_type === 'style' ||
           iss.severity === 'info' ||
@@ -59,8 +61,10 @@ export const FindingList: React.FC<FindingListProps> = ({
         }
 
         list.push({ filePath: fr.file_path, issue: iss });
+          });
+        }
       });
-    });
+    }
 
     return list;
   }, [report, mode, severityFilter, searchQuery]);

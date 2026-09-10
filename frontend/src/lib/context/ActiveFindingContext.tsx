@@ -30,19 +30,33 @@ export const ActiveFindingProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Initialize with a default finding from stored reviews so direct sidebar entry has context
   useEffect(() => {
-    if (!activeIssue) {
-      const stored = getStoredReviews();
-      const firstReport = stored.find((r) => r.report && r.report.file_reports?.length > 0)?.report || SAMPLE_REPORT_PR42;
+    try {
+      if (!activeIssue) {
+        const stored = getStoredReviews();
+        const firstReport =
+          stored?.find(
+            (r) =>
+              r?.report &&
+              Array.isArray(r.report.file_reports) &&
+              r.report.file_reports.length > 0
+          )?.report || SAMPLE_REPORT_PR42;
 
-      if (firstReport && firstReport.file_reports.length > 0) {
-        const fileReport = firstReport.file_reports.find((f) => f.issues.length > 0) || firstReport.file_reports[0];
-        if (fileReport && fileReport.issues.length > 0) {
-          setActiveReport(firstReport);
-          setActiveFilePath(fileReport.file_path);
-          setActiveFileContent(fileReport.file_content || '');
-          setActiveIssue(fileReport.issues[0]);
+        if (firstReport && Array.isArray(firstReport.file_reports) && firstReport.file_reports.length > 0) {
+          const fileReport =
+            firstReport.file_reports.find(
+              (f) => f && Array.isArray(f.issues) && f.issues.length > 0
+            ) || firstReport.file_reports[0];
+
+          if (fileReport && Array.isArray(fileReport.issues) && fileReport.issues.length > 0) {
+            setActiveReport(firstReport);
+            setActiveFilePath(fileReport.file_path || '');
+            setActiveFileContent(fileReport.file_content || '');
+            setActiveIssue(fileReport.issues[0]);
+          }
         }
       }
+    } catch (err) {
+      console.warn('Error initializing active finding context:', err);
     }
   }, [activeIssue]);
 

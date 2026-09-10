@@ -33,6 +33,7 @@ class ReviewGenerator:
         """
         Runs the deterministic finding pipeline: collect -> deduplicate -> prioritize -> select -> reason.
         """
+        self.traces = []
         # PR Scope Safety Check (Requirement 8): finding.file_path ∈ PR_CHANGED_FILES
         file_path = aggregated.get("file_path", "")
         pr_changed_files = aggregated.get("pr_changed_files", [])
@@ -713,10 +714,74 @@ class ReviewGenerator:
         else:
             reasoning_trace.append("Static rule explanation applied (Bypassed LLM reasoning).")
 
+        # Extract dataflow path if available
+        evidence_dict = finding.get("evidence", {}) or {}
+        df_findings = evidence_dict.get("dataflow_findings", [])
+        dataflow_path = None
+        if df_findings and isinstance(df_findings, list):
+            first_df = df_findings[0]
+            if isinstance(first_df, dict) and first_df.get("flow_path"):
+                dataflow_path = [str(p) for p in first_df["flow_path"]]
+
         # Ensure all detection sources are preserved
         detection_sources = list(finding.get("sources", []))
         if primary_source and primary_source not in detection_sources:
             detection_sources.append(primary_source)
+        if df_findings and "dataflow" not in detection_sources:
+            detection_sources.append("dataflow")
+        if not detection_sources:
+            detection_sources = ["ast"]
+
+        # Extract or derive standards
+        standards = list(finding.get("standards") or [])
+        iss_text = (finding.get("issue") or "").lower()
+        if not standards:
+            if "sql" in iss_text:
+                standards = ["CWE-89", "OWASP A03:2021-Injection"]
+            elif "command" in iss_text or "shell" in iss_text:
+                standards = ["CWE-78", "OWASP A03:2021-Injection"]
+            elif "xss" in iss_text:
+                standards = ["CWE-79", "OWASP A03:2021-Injection"]
+            elif "path" in iss_text or "traversal" in iss_text:
+                standards = ["CWE-22", "OWASP A01:2021-Broken Access Control"]
+            elif "pickle" in iss_text or "deserial" in iss_text:
+                standards = ["CWE-502", "OWASP A08:2021-Software and Data Integrity Failures"]
+            elif finding.get("severity") in ("critical", "high"):
+                standards = ["CWE-Security", "OWASP ASVS"]
+
+        # Extract impact
+        impact = ai_details.get("impact")
+        if not impact:
+            sev = finding.get("severity", "medium").lower()
+            if sev == "critical":
+                impact = "Potential remote code execution, database compromise, or severe unauthorized system access."
+            elif sev == "high":
+                impact = "Unvalidated input propagation could alter control flow or sensitive state integrity."
+            else:
+                impact = "Defensive coding or maintainability standard violation."
+
+        # Record confidence_and_grounding trace for observability and verification
+        self.traces.append({
+            "stage": "confidence_and_grounding",
+            "duration_ms": 0.0,
+            "input_data": {
+                "line": line,
+                "sources": detection_sources,
+                "evidence": finding.get("evidence", {}),
+            },
+            "output_data": {
+                "arithmetic_steps": reasoning_trace,
+                "confidence_score": conf_details["confidence"],
+                "evidence_strength": evidence_strength,
+                "reasoning_activated": reasoning_activated,
+                "priority_score": priority_score,
+                "source_attributions": {
+                    "linters": [r.get("tool") for r in finding.get("evidence", {}).get("linter_rules", [])],
+                    "ast_patterns": [n.get("pattern", n.get("rule_name", "")) for n in finding.get("evidence", {}).get("ast_nodes", [])],
+                    "dataflow_findings": [f.get("rule_id") for f in finding.get("evidence", {}).get("dataflow_findings", [])],
+                },
+            },
+        })
 
         return ReviewIssue(
             line=line,
@@ -729,7 +794,7 @@ class ReviewGenerator:
             fix=ai_details.get("fix") or "",
             patch=ai_details.get("patch", ""),
             issue_type=ai_details.get("issue_type", finding.get("issue_type", "code_smell")),
-            sources=list(finding.get("sources", [])),
+            sources=detection_sources,
             reasoning_trace=reasoning_trace,
             evidence=finding.get("evidence", {}),
             signal_priority=priority_info.get("signal_priority", "medium"),
@@ -741,6 +806,10 @@ class ReviewGenerator:
             detection_sources=detection_sources,
             llm_provider=llm_provider,
             llm_model=llm_model,
+            dataflow_path=dataflow_path,
+            standards=standards,
+            impact=impact,
+            category=priority_info.get("issue_category", "runtime logic risks"),
         )
 
     # ═══════════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '@/lib/api/client';
 import { updateStoredReview } from '@/lib/storage/reviews';
@@ -11,7 +11,8 @@ import {
   RotateCw,
   ArrowLeft,
   CheckCircle2,
-  Cpu,
+  XCircle,
+  Ban,
 } from 'lucide-react';
 
 interface ReviewProcessingProps {
@@ -21,6 +22,18 @@ interface ReviewProcessingProps {
   onCompleted?: (report: ReviewReport) => void;
 }
 
+type ReviewStatus = 'queued' | 'processing' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
+
+const PIPELINE_STAGES = [
+  { key: 'github_pr_resolution', label: 'GitHub PR metadata & branch resolution' },
+  { key: 'git_clone_and_checkout', label: 'PR diff isolation & repository checkout' },
+  { key: 'diff_parsing_and_scope_filter', label: 'Diff parsing & exact PR scope enforcement' },
+  { key: 'repository_supporting_context', label: 'Supporting context & repository architecture' },
+  { key: 'primary_file_static_analysis', label: 'Deterministic static analyzers & AI reasoning' },
+  { key: 'metrics_synthesis', label: 'Invariant metrics calculation & synthesis' },
+  { key: 'report_persistence', label: 'Report persistence & database indexing' },
+];
+
 export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
   reviewId,
   repoUrl = 'Repository Review',
@@ -28,87 +41,131 @@ export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
   onCompleted,
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('Initializing review pipeline...');
+  const [statusMessage, setStatusMessage] = useState('Connecting to review pipeline...');
+  const [reviewStatus, setReviewStatus] = useState<ReviewStatus>('processing');
+  const [currentStageKey, setCurrentStageKey] = useState<string>('github_pr_resolution');
   const [error, setError] = useState<string | null>(null);
-  const [pollCount, setPollCount] = useState(0);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
-  // General pipeline stages for visual orientation (without fake percentages)
-  const pipelineStages = [
-    'Repository checkout and diff isolation',
-    'AST parsing and heuristic rules',
-    'Flake8, PyLint, and Bandit linters',
-    'Control Flow Graph & cyclomatic analysis',
-    'Dataflow graph & taint tracking',
-    'Repository architecture & risk hotspots',
-    'Gemini RAG vector retrieval (768-dim)',
-    'Groq LLM reasoning (llama-3.3-70b-versatile)',
-    'Invariant metrics calculation & synthesis',
-  ];
+  const isTerminal = reviewStatus === 'completed' || reviewStatus === 'failed' || reviewStatus === 'cancelled' || reviewStatus === 'timed_out' || !!error;
 
-  // Active stage estimate based on elapsed time without fake percentage numbers
-  const currentStageIndex = Math.min(
-    pipelineStages.length - 1,
-    Math.floor(elapsedSeconds / 4)
-  );
-
-  // Elapsed timer
+  // 1. Elapsed timer - halts immediately once a terminal state is reached
   useEffect(() => {
+    if (isTerminal) return;
+
     const timer = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
-  // Polling loop
+    return () => clearInterval(timer);
+  }, [isTerminal]);
+
+  // 2. Single Polling Loop with progressive backoff and AbortController
+  const onCompletedRef = useRef(onCompleted);
+  onCompletedRef.current = onCompleted;
+
   useEffect(() => {
     let isCancelled = false;
+    let timeoutId: NodeJS.Timeout | null = null;
+    const controller = new AbortController();
 
     async function poll() {
       if (isCancelled) return;
 
       try {
-        const res = await apiClient.getReview(reviewId);
+        // Use lightweight status endpoint (<10ms)
+        const statusRes = await apiClient.getReviewStatus(reviewId, controller.signal);
 
-        if (res.status === 'completed') {
-          updateStoredReview(reviewId, {
-            status: 'completed',
-            duration_seconds: elapsedSeconds,
-            report: res.report,
-          });
-          onCompleted?.(res.report);
-          return;
-        }
+        if (isCancelled) return;
 
-        if (res.status === 'running') {
-          if (res.message) setStatusMessage(res.message);
-          updateStoredReview(reviewId, {
-            status: 'running',
-            duration_seconds: elapsedSeconds,
-          });
-        } else if (res.status === 'failed') {
-          setError(res.error || 'Review pipeline failed during execution.');
-          updateStoredReview(reviewId, {
-            status: 'failed',
-            error_message: res.error,
-          });
-          return;
-        } else if (res.status === 'not_found') {
-          // Keep polling for a brief grace period if just initiated
-          if (pollCount > 8) {
-            setError('Review was not found on backend.');
+        const rawStatus = (statusRes.status || 'processing').toLowerCase() as ReviewStatus;
+
+        if (rawStatus === 'completed') {
+          setReviewStatus('completed');
+          setStatusMessage('Review complete. Loading report...');
+          setCurrentStageKey('completed');
+
+          // Fetch complete report once
+          const reportRes = await apiClient.getReview(reviewId, controller.signal);
+          if (reportRes.status === 'completed') {
+            updateStoredReview(reviewId, {
+              status: 'completed',
+              duration_seconds: statusRes.duration_seconds || elapsedSeconds,
+              report: reportRes.report,
+            });
+            onCompletedRef.current?.(reportRes.report);
             return;
           }
+        } else if (rawStatus === 'failed') {
+          const errMsg = statusRes.error_message || statusRes.message || 'Review pipeline failed during execution.';
+          setReviewStatus('failed');
+          setError(errMsg);
+          updateStoredReview(reviewId, {
+            status: 'failed',
+            error_message: errMsg,
+          });
+          return;
+        } else if (rawStatus === 'timed_out') {
+          const errMsg = statusRes.error_message || 'Review execution timed out.';
+          setReviewStatus('timed_out');
+          setError(errMsg);
+          updateStoredReview(reviewId, {
+            status: 'failed',
+            error_message: errMsg,
+          });
+          return;
+        } else if (rawStatus === 'cancelled') {
+          setReviewStatus('cancelled');
+          setError('Review was cancelled.');
+          updateStoredReview(reviewId, {
+            status: 'failed',
+            error_message: 'Review was cancelled.',
+          });
+          return;
+        } else {
+          // 'queued', 'processing', 'running'
+          setReviewStatus(rawStatus);
+          if (statusRes.message) setStatusMessage(statusRes.message);
+          if (statusRes.stage) setCurrentStageKey(statusRes.stage);
+
+          updateStoredReview(reviewId, {
+            status: 'running',
+            duration_seconds: statusRes.duration_seconds || elapsedSeconds,
+          });
         }
       } catch (err: unknown) {
-        // Network warning without halting polling immediately
-        console.warn('Polling notice:', err);
+        if (isCancelled) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+
+        // Fallback: try standard getReview endpoint if status endpoint has unexpected issue
+        try {
+          const fallbackRes = await apiClient.getReview(reviewId, controller.signal);
+          if (fallbackRes.status === 'completed') {
+            setReviewStatus('completed');
+            updateStoredReview(reviewId, {
+              status: 'completed',
+              report: fallbackRes.report,
+            });
+            onCompletedRef.current?.(fallbackRes.report);
+            return;
+          } else if (fallbackRes.status === 'failed') {
+            setReviewStatus('failed');
+            setError(fallbackRes.error || 'Review pipeline failed.');
+            return;
+          }
+        } catch {
+          // Keep polling softly
+        }
       }
 
-      // Schedule next poll in 2.5s
-      if (!isCancelled && !error) {
-        setTimeout(() => {
-          setPollCount((c) => c + 1);
-        }, 2500);
+      // Progressive backoff interval:
+      // 0 - 30s: 2.5s
+      // 30 - 90s: 4.0s
+      // 90s+: 6.0s
+      const delay = elapsedSeconds < 30 ? 2500 : elapsedSeconds < 90 ? 4000 : 6000;
+
+      if (!isCancelled) {
+        timeoutId = setTimeout(poll, delay);
       }
     }
 
@@ -116,8 +173,22 @@ export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
 
     return () => {
       isCancelled = true;
+      controller.abort();
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [reviewId, pollCount, error, elapsedSeconds, onCompleted]);
+  }, [reviewId, retryTrigger]);
+
+  const activeStageIndex = Math.max(
+    0,
+    PIPELINE_STAGES.findIndex((s) => s.key === currentStageKey)
+  );
+
+  const handleRetry = () => {
+    setError(null);
+    setReviewStatus('processing');
+    setStatusMessage('Re-checking review pipeline status...');
+    setRetryTrigger((prev) => prev + 1);
+  };
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[#f8fafc] dark:bg-[#0a0d14]">
@@ -137,10 +208,33 @@ export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-mono text-blue-600 dark:text-blue-400">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <span>Running</span>
-          </div>
+          {/* Honest Status Badge */}
+          {error || reviewStatus === 'failed' || reviewStatus === 'timed_out' ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-xs font-mono text-red-600 dark:text-red-400">
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Failed</span>
+            </div>
+          ) : reviewStatus === 'completed' ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Completed</span>
+            </div>
+          ) : reviewStatus === 'cancelled' ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-500/10 border border-slate-500/20 text-xs font-mono text-slate-600 dark:text-slate-400">
+              <Ban className="w-3.5 h-3.5" />
+              <span>Cancelled</span>
+            </div>
+          ) : reviewStatus === 'queued' ? (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-mono text-amber-600 dark:text-amber-400">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Queued</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-mono text-blue-600 dark:text-blue-400">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Running</span>
+            </div>
+          )}
         </div>
 
         {/* Error Notification if failed */}
@@ -152,17 +246,14 @@ export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
                 <div className="text-xs font-bold uppercase tracking-wider">
                   Analysis Pipeline Halted
                 </div>
-                <div className="text-xs font-mono mt-1">{error}</div>
+                <div className="text-xs font-mono mt-1 leading-relaxed">{error}</div>
               </div>
             </div>
             <div className="flex items-center gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => {
-                  setError(null);
-                  setPollCount(0);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-red-600 text-white hover:bg-red-700"
+                onClick={handleRetry}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
               >
                 <RotateCw className="w-3.5 h-3.5" />
                 <span>Retry Connection</span>
@@ -200,19 +291,19 @@ export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
                 Execution Pipeline
               </div>
               <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                {pipelineStages.map((stage, idx) => {
-                  const isDone = idx < currentStageIndex;
-                  const isCurrent = idx === currentStageIndex;
+                {PIPELINE_STAGES.map((stage, idx) => {
+                  const isDone = idx < activeStageIndex || reviewStatus === 'completed';
+                  const isCurrent = idx === activeStageIndex && reviewStatus !== 'completed';
 
                   return (
                     <div
-                      key={stage}
+                      key={stage.key}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded text-xs font-mono transition-colors ${
                         isCurrent
                           ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-medium'
                           : isDone
                           ? 'text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/20'
-                          : 'text-slate-600 dark:text-slate-400'
+                          : 'text-slate-500 dark:text-slate-500'
                       }`}
                     >
                       {isDone ? (
@@ -222,7 +313,7 @@ export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
                       ) : (
                         <div className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-700 shrink-0" />
                       )}
-                      <span className="truncate">{stage}</span>
+                      <span className="truncate">{stage.label}</span>
                     </div>
                   );
                 })}
@@ -240,8 +331,8 @@ export const ReviewProcessing: React.FC<ReviewProcessingProps> = ({
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Dashboard</span>
           </Link>
-          <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
-            LLM: llama-3.3-70b-versatile
+          <span className="text-[11px] font-mono text-slate-500">
+            LLM: Groq primary (Gemini fallback)
           </span>
         </div>
       </div>

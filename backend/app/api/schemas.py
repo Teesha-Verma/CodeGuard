@@ -35,6 +35,10 @@ class ReviewIssue(BaseModel):
     file_path: Optional[str] = Field(None, description="Path to the reviewed file containing this issue")
     llm_provider: Optional[str] = Field(None, description="LLM provider used for reasoning")
     llm_model: Optional[str] = Field(None, description="LLM model used for reasoning")
+    dataflow_path: Optional[List[str]] = Field(default=None, description="Source-to-sink taint propagation path if applicable")
+    standards: Optional[List[str]] = Field(default_factory=list, description="Associated security standards (e.g. CWE, OWASP)")
+    impact: Optional[str] = Field(default=None, description="Real-world security or operational impact")
+    category: Optional[str] = Field(default=None, description="Normalized issue category")
 
     @model_serializer(mode="wrap")
     def serialize_model(self, handler) -> Dict[str, Any]:
@@ -127,6 +131,7 @@ class FileReport(BaseModel):
     ast_metadata: Optional[Dict[str, Any]] = Field(None, description="Extracted AST structural metadata")
     ast_summary: Optional[Dict[str, Any]] = Field(None, description="Summarized AST metadata")
     linter_findings: Optional[List[Dict[str, Any]]] = Field(None, description="Raw linter findings for this file")
+    file_content: Optional[str] = Field(None, description="Source content of the file for preview and highlighting")
 
     def __init__(self, **data):
         issues_helper = data.pop("issues", [])
@@ -165,6 +170,8 @@ class FileReport(BaseModel):
                 original_list = getattr(self, field_name)
                 if original_list:
                     data[field_name] = [issue.model_dump(*args, **clean_kwargs) for issue in original_list]
+        # Provide issues alias for backwards compatibility
+        data["issues"] = data.get("meaningful_issues", []) + data.get("style_findings", []) + data.get("suppressed_findings", [])
         return data
 
     def model_dump_json(self, *args, **kwargs):
@@ -184,6 +191,12 @@ class FileReport(BaseModel):
 
 class ReviewReport(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")
+    repo_url: Optional[str] = Field(None, description="Repository URL if PR review")
+    pr_number: Optional[int] = Field(None, description="PR number if PR review")
+    snippet_filename: Optional[str] = Field(None, description="Filename if snippet review")
+    created_at: Optional[str] = Field(None, description="Timestamp review was created")
+    duration_seconds: Optional[float] = Field(None, description="Total analysis duration in seconds")
+    repo_intelligence: Optional[Dict[str, Any]] = Field(None, description="Repository architecture and hotspot analysis")
     file_reports: List[FileReport] = Field(default_factory=list, description="List of file reports")
     summary_stats: Dict[str, Any] = Field(default_factory=dict, description="Aggregated statistics of the review")
     evaluation_metrics: Optional[Dict[str, Any]] = Field(None, description="Evaluation metrics (if ground truth is available or for benchmark comparisons)")
@@ -235,5 +248,269 @@ class ReviewReport(BaseModel):
 
 class ReviewStatusResponse(BaseModel):
     review_id: str = Field(..., description="Unique identifier for this review")
-    status: str = Field(..., description="Current status of the pipeline")
-    message: str = Field(..., description="Status message")
+    status: str = Field(..., description="Current status of the pipeline: queued, running, processing, completed, failed, cancelled, timed_out")
+    message: Optional[str] = Field("Status update", description="Status message")
+    stage: Optional[str] = Field(None, description="Current execution stage")
+    error_code: Optional[str] = Field(None, description="Error code if review failed")
+    error_message: Optional[str] = Field(None, description="Detailed error description if review failed")
+    failed_stage: Optional[str] = Field(None, description="Pipeline stage where failure occurred")
+    duration_seconds: Optional[float] = Field(None, description="Elapsed execution duration in seconds")
+    started_at: Optional[str] = Field(None, description="ISO timestamp when processing started")
+    updated_at: Optional[str] = Field(None, description="ISO timestamp of last status update")
+    progress_percent: Optional[int] = Field(None, description="Optional stage-based progress percentage")
+
+
+# ============================================================
+# REVIEW HISTORY & DASHBOARD SCHEMAS
+# ============================================================
+
+class StoredReviewSummary(BaseModel):
+    review_id: str
+    type: str = Field("pr", description="'pr' or 'snippet'")
+    repo_url: Optional[str] = None
+    pr_number: Optional[int] = None
+    filename: Optional[str] = None
+    language: Optional[str] = "python"
+    status: str = Field("completed", description="'started', 'running', 'completed', 'failed'")
+    created_at: str
+    duration_seconds: Optional[float] = None
+    total_issues: int = 0
+    meaningful_issues: int = 0
+    style_findings: int = 0
+    suppressed_findings: int = 0
+    critical_issues: int = 0
+    high_issues: int = 0
+    error_message: Optional[str] = None
+
+
+class ReviewHistoryResponse(BaseModel):
+    reviews: List[StoredReviewSummary]
+    total: int
+    limit: int
+    offset: int
+
+
+class DashboardStatsResponse(BaseModel):
+    total_reviews: int
+    completed_reviews: int
+    total_issues_found: int
+    total_issues: Optional[int] = None
+    critical_high_issues: int
+    critical_count: Optional[int] = 0
+    recent_reviews: List[StoredReviewSummary] = Field(default_factory=list)
+
+
+# ============================================================
+# DATAFLOW / TAINT SCHEMAS
+# ============================================================
+
+class DataflowNode(BaseModel):
+    id: str
+    step_number: int
+    label: str
+    role: str = Field(..., description="'SOURCE', 'INPUT', 'PROPAGATION', 'TRANSFORMATION', 'SINK'")
+    description: str
+    code_snippet: str
+    line: Optional[int] = None
+    file_path: Optional[str] = None
+
+
+class DataflowResponse(BaseModel):
+    review_id: str
+    file_path: str
+    line: int
+    has_dataflow: bool
+    nodes: List[DataflowNode] = Field(default_factory=list)
+    message: Optional[str] = None
+
+
+# ============================================================
+# FIX PLAYGROUND SCHEMAS
+# ============================================================
+
+class PlaygroundReviewRequest(BaseModel):
+    code: str = Field(..., description="Modified source code to re-analyze")
+    language: str = Field("python", description="Language of snippet")
+    filename: str = Field("snippet.py", description="Virtual filename")
+    original_issue_category: Optional[str] = Field(None, description="Category of original finding to verify remediation")
+    original_issue_line: Optional[int] = Field(None, description="Original finding line number")
+    original_finding_line: Optional[int] = Field(None, description="Alias for original finding line number")
+
+
+class PlaygroundReviewResponse(BaseModel):
+    status: str = Field(..., description="'resolved', 'still_detected', or 'error'")
+    resolved: bool = Field(..., description="True if target issue has been eliminated")
+    is_resolved: Optional[bool] = None
+    total_issues: Optional[int] = 0
+    message: str
+    findings: List[ReviewIssue] = Field(default_factory=list)
+    summary_stats: Dict[str, Any] = Field(default_factory=dict)
+
+
+# ============================================================
+# LEARNER MODE SCHEMAS
+# ============================================================
+
+class QuizModel(BaseModel):
+    question: str
+    options: List[str]
+    correct_option: int = 0
+    correct_index: Optional[int] = None
+    explanation: str
+
+
+class LearnerFindingRequest(BaseModel):
+    review_id: Optional[str] = None
+    file_path: Optional[str] = None
+    line: Optional[int] = None
+    finding_line: Optional[int] = None
+    issue_text: Optional[str] = None
+    category: Optional[str] = None
+    code_snippet: Optional[str] = None
+
+
+class LearnerFindingResponse(BaseModel):
+    concept_title: str = "Security Concept"
+    concept: Optional[str] = None
+    cwe: str = "CWE-General"
+    owasp: str = "OWASP-General"
+    concept_summary: str = ""
+    why_it_matters: str = ""
+    what_happened_in_code: str = ""
+    what_happened: Optional[str] = None
+    impact: str = ""
+    evidence_breakdown: str = ""
+    evidence: Optional[str] = None
+    detection_sources: List[str] = Field(default_factory=list)
+    how_to_fix: str = ""
+    good_code: str = ""
+    safer_implementation: Optional[str] = None
+    bad_code: str = ""
+    key_takeaway: Optional[str] = None
+    quiz: QuizModel
+    standards: List[str] = Field(default_factory=list)
+
+
+# ============================================================
+# AI ASSISTANT SCHEMAS
+# ============================================================
+
+class AssistantMessage(BaseModel):
+    role: str = Field(..., description="'user' or 'assistant'")
+    content: str
+    context_pill: Optional[str] = None
+
+
+class AssistantChatRequest(BaseModel):
+    messages: List[AssistantMessage] = Field(default_factory=list)
+    review_id: Optional[str] = None
+    file_path: Optional[str] = None
+    line: Optional[int] = None
+    finding_line: Optional[int] = None
+    query: Optional[str] = None
+    context: Optional[str] = None
+
+
+class AssistantChatResponse(BaseModel):
+    message: str = ""
+    reply: Optional[str] = None
+    provider: str = "codeguard"
+    model: str = "ast-rules"
+    fallback_used: bool = False
+    trace_id: str = "assistant_trace"
+    context_used: Optional[str] = None
+
+
+# ============================================================
+# SECURITY HEALTH & RISK VIEW SCHEMAS
+# ============================================================
+
+class SecurityHealthResponse(BaseModel):
+    security_score: int = Field(100, ge=0, le=100, description="Deterministic security posture score (0-100)")
+    score: Optional[int] = None
+    grade: Optional[str] = "A"
+    total_reviews: int = 0
+    total_issues: int = 0
+    critical_count: int = 0
+    critical_issues: Optional[int] = None
+    high_count: int = 0
+    high_issues: Optional[int] = None
+    medium_count: int = 0
+    medium_issues: Optional[int] = None
+    low_count: int = 0
+    low_issues: Optional[int] = None
+    style_count: int = 0
+    style_issues: Optional[int] = None
+    llm_reasoned_count: int = 0
+    static_reasoned_count: int = 0
+    categories: Dict[str, int] = Field(default_factory=dict)
+    category_breakdown: Dict[str, int] = Field(default_factory=dict)
+    score_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    formula: Optional[str] = ""
+
+
+class FileRiskItem(BaseModel):
+    file_path: str
+    repo_url: Optional[str] = ""
+    pr_number: Optional[int] = None
+    critical: int = 0
+    critical_count: Optional[int] = None
+    high: int = 0
+    high_count: Optional[int] = None
+    medium: int = 0
+    medium_count: Optional[int] = None
+    low: int = 0
+    low_count: Optional[int] = None
+    total: int = 0
+    total_count: Optional[int] = None
+    risk_score: int = 0
+    risk_tier: str = Field("LOW", description="'HIGH', 'MEDIUM', 'LOW'")
+    complexity: str = Field("Low", description="'High', 'Medium', 'Low'")
+    fan_in: int = 0
+    fan_out: int = 0
+    categories: List[str] = Field(default_factory=list)
+
+
+class RepositoryRiskResponse(BaseModel):
+    overall_risk: str = "medium"
+    ranked_files: List[FileRiskItem] = Field(default_factory=list)
+    top_categories: Dict[str, int] = Field(default_factory=dict)
+    formula: str = ""
+    files: List[FileRiskItem] = Field(default_factory=list)
+    high_risk_count: int = 0
+    medium_risk_count: int = 0
+    low_risk_count: int = 0
+
+
+# ============================================================
+# KNOWLEDGE BASE & ACADEMY SCHEMAS
+# ============================================================
+
+class KnowledgeTopicSummary(BaseModel):
+    id: str
+    title: str
+    category: str
+    cwe: str
+    owasp: str
+    severity: str
+    summary: str
+
+
+class KnowledgeTopicDetail(BaseModel):
+    id: str
+    title: str
+    category: str
+    cwe: str
+    owasp: str
+    severity: str
+    summary: str
+    why_it_matters: str = ""
+    mechanics: str = ""
+    vulnerable_example: str = ""
+    secure_example: str = ""
+    secure_remediation: str = ""
+    preventive_guidelines: List[str] = Field(default_factory=list)
+    detection_rule: str = ""
+    quiz: Optional[QuizModel] = None
+
+

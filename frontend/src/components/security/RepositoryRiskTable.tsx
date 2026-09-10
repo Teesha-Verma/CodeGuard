@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getStoredReviews } from '@/lib/storage/reviews';
+import { apiClient, RepositoryRiskResponse } from '@/lib/api/client';
 import { SeverityBadge } from '@/components/common/Badges';
 import {
   ShieldAlert,
@@ -31,11 +32,54 @@ interface FileRiskRow {
 
 export const RepositoryRiskTable: React.FC = () => {
   const reviews = getStoredReviews();
+  const [backendRisk, setBackendRisk] = useState<RepositoryRiskResponse | null>(null);
   const [filterTier, setFilterTier] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Build risk rows from stored reviews
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getRiskReport()
+      .then((data) => {
+        if (!cancelled && data) {
+          setBackendRisk(data);
+        }
+      })
+      .catch(() => {
+        // Fallback to local reviews
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Build risk rows from stored reviews and backend risk telemetry
   const fileMap: Record<string, FileRiskRow> = {};
+
+  if (backendRisk?.files && backendRisk.files.length > 0) {
+    backendRisk.files.forEach((f) => {
+      fileMap[f.file_path] = {
+        filePath: f.file_path,
+        repoUrl: f.repo_url || 'Active Repository',
+        critical: f.critical,
+        high: f.high,
+        medium: f.medium,
+        low: f.low,
+        total: f.total,
+        riskScore: f.risk_score,
+        riskTier: (f.risk_tier?.toUpperCase() === 'HIGH'
+          ? 'HIGH'
+          : f.risk_tier?.toUpperCase() === 'MEDIUM'
+          ? 'MEDIUM'
+          : 'LOW') as 'HIGH' | 'MEDIUM' | 'LOW',
+        complexity: f.complexity,
+        fanIn: f.fan_in,
+        fanOut: f.fan_out,
+        categories: f.categories,
+      };
+    });
+  }
 
   reviews.forEach((record) => {
     const report = record.report;

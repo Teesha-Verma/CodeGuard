@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { SECURITY_TOPICS, SecurityTopic, getTopicById } from '@/lib/data/securityKnowledge';
+import { apiClient } from '@/lib/api/client';
 import { MiniQuiz } from '@/components/learner/MiniQuiz';
 import { useActiveFinding } from '@/lib/context/ActiveFindingContext';
 import {
@@ -35,6 +36,40 @@ export default function AcademyPage() {
       if (match) setSelectedTopic(match);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getKnowledgeTopic(selectedTopic.id)
+      .then((detail) => {
+        if (!cancelled && detail) {
+          setSelectedTopic((prev) => ({
+            ...prev,
+            title: detail.title || prev.title,
+            summary: detail.summary || prev.summary,
+            whyItMatters: detail.why_it_matters || prev.whyItMatters,
+            preventiveGuidelines: detail.prevention_guidelines?.length
+              ? detail.prevention_guidelines
+              : prev.preventiveGuidelines,
+            vulnerableExample: detail.vulnerable_example || prev.vulnerableExample,
+            secureExample: detail.secure_example || prev.secureExample,
+            quiz: detail.quiz
+              ? {
+                  question: detail.quiz.question,
+                  options: detail.quiz.options,
+                  correctIndex: detail.quiz.correct_index ?? detail.quiz.correct_option ?? 0,
+                  explanation: detail.quiz.explanation,
+                }
+              : prev.quiz,
+          }));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTopic.id]);
 
   useEffect(() => {
     document.title = `${selectedTopic.title} — Security Academy | CodeGuard V2`;

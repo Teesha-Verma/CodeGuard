@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getStoredReviews } from '@/lib/storage/reviews';
+import { apiClient, SecurityHealthResponse } from '@/lib/api/client';
 import { SeverityBadge } from '@/components/common/Badges';
 import {
   ShieldAlert,
@@ -12,11 +13,31 @@ import {
   Layers,
   ArrowRight,
   TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const SecurityHealthOverview: React.FC = () => {
   const reviews = getStoredReviews();
+  const [backendHealth, setBackendHealth] = useState<SecurityHealthResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getSecurityHealth()
+      .then((data) => {
+        if (!cancelled && data) {
+          setBackendHealth(data);
+        }
+      })
+      .catch(() => {
+        // Fall back gracefully to local calculation
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Compute real aggregated KPIs across stored reviews
   let totalIssues = 0;
@@ -71,8 +92,44 @@ export const SecurityHealthOverview: React.FC = () => {
     return scoreB - scoreA;
   });
 
+  const effectiveCritical = backendHealth?.critical_issues ?? criticalCount;
+  const effectiveHigh = backendHealth?.high_issues ?? highCount;
+  const effectiveTotal = backendHealth?.total_issues ?? totalIssues;
+  const effectiveScore = backendHealth?.health_score ?? (reviews.length > 0 ? Math.max(0, 100 - (criticalCount * 15 + highCount * 8 + mediumCount * 3 + lowCount * 1)) : 100);
+  const effectiveGrade = backendHealth?.health_grade ?? (effectiveCritical > 0 ? 'C' : effectiveHigh > 0 ? 'B' : 'A');
+
   return (
     <div className="space-y-6">
+      {/* Security Health Score Banner */}
+      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0d111a] p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="space-y-1 max-w-xl">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-500" />
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              Deterministic Security Health Score
+            </h2>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-semibold">
+              Live Backend Telemetry
+            </span>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            Formula: {backendHealth?.formula_explanation || '100 - (15×crit + 8×high + 3×med + 1×low)'}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="text-right">
+            <div className="text-3xl font-bold font-mono text-slate-900 dark:text-slate-100">
+              {effectiveScore}
+              <span className="text-xs text-slate-400 font-normal"> / 100</span>
+            </div>
+            <div className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+              Grade {effectiveGrade}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Critical Vulnerabilities */}
@@ -84,7 +141,7 @@ export const SecurityHealthOverview: React.FC = () => {
             <ShieldAlert className="w-4 h-4" />
           </div>
           <div className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
-            {criticalCount}
+            {effectiveCritical}
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
             Immediate remediation required (CWE injections / RCE)
@@ -100,7 +157,7 @@ export const SecurityHealthOverview: React.FC = () => {
             <AlertTriangle className="w-4 h-4" />
           </div>
           <div className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
-            {highCount}
+            {effectiveHigh}
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
             Sensitive parameter flows &amp; access controls
@@ -116,7 +173,7 @@ export const SecurityHealthOverview: React.FC = () => {
             <Activity className="w-4 h-4" />
           </div>
           <div className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
-            {totalIssues}
+            {effectiveTotal}
           </div>
           <p className="text-[11px] text-slate-500 mt-1">
             Across {reviews.length} completed review scans

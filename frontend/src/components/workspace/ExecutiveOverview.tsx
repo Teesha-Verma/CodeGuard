@@ -35,11 +35,15 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({
 
   // Flatten all issues for table display
   const allIssues: Array<{ filePath: string; issue: ReviewIssue }> = [];
-  report.file_reports.forEach((fr) => {
-    fr.issues.forEach((iss) => {
-      allIssues.push({ filePath: fr.file_path, issue: iss });
+  if (Array.isArray(report?.file_reports)) {
+    report.file_reports.forEach((fr) => {
+      if (Array.isArray(fr?.issues)) {
+        fr.issues.forEach((iss) => {
+          allIssues.push({ filePath: fr.file_path, issue: iss });
+        });
+      }
     });
-  });
+  }
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-2">

@@ -7,7 +7,7 @@ import { Terminal, Code2, BookOpen, Bot } from 'lucide-react';
 
 export default function DataflowPage() {
   const navigate = useNavigate();
-  const { activeIssue, activeFilePath, activeFileContent } = useActiveFinding();
+  const { activeIssue, activeFilePath, activeFileContent, activeReport } = useActiveFinding();
 
   useEffect(() => {
     document.title = 'Dataflow & Taint Analysis — CodeGuard V2';
@@ -60,6 +60,7 @@ export default function DataflowPage() {
             issue={activeIssue}
             filePath={activeFilePath || 'snippet.py'}
             fileContent={activeFileContent}
+            reviewId={activeReport?.review_id}
             onFixInPlayground={() => navigate('/playground')}
           />
         </div>

@@ -23,11 +23,14 @@ import RiskViewPage from './pages/RiskViewPage';
 import AcademyPage from './pages/AcademyPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
 
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+
 export default function App() {
   return (
     <ThemeProvider>
-      <ActiveFindingProvider>
-        <BrowserRouter>
+      <ErrorBoundary>
+        <ActiveFindingProvider>
+          <BrowserRouter>
           <Routes>
             {/* Public Marketing & Auth Routes */}
             <Route path="/" element={<LandingPage />} />
@@ -56,7 +59,8 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
-      </ActiveFindingProvider>
+        </ActiveFindingProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { getStoredReviews, deleteStoredReview } from '@/lib/storage/reviews';
+import { apiClient } from '@/lib/api/client';
 import { StoredReviewRecord } from '@/types';
 import { StatusBadge } from '@/components/common/Badges';
 import {
@@ -18,9 +19,46 @@ export default function ReviewsHistoryPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const loadData = () => {
-    const data = getStoredReviews();
-    setReviews(data);
+  const loadData = async () => {
+    const local = getStoredReviews();
+    setReviews(local);
+
+    try {
+      const remote = await apiClient.listReviews();
+      if (remote && Array.isArray(remote.reviews)) {
+        // Merge remote and local by review_id
+        const map = new Map<string, StoredReviewRecord>();
+        local.forEach((r) => map.set(r.review_id, r));
+        remote.reviews.forEach((r) =>
+          map.set(r.review_id, {
+            review_id: r.review_id,
+            type: r.type,
+            repo_url: r.repo_url,
+            pr_number: r.pr_number,
+            filename: r.filename,
+            language: r.language,
+            status: (r.status === 'completed'
+              ? 'completed'
+              : r.status === 'failed' || r.status === 'cancelled'
+              ? 'failed'
+              : r.status === 'queued'
+              ? 'queued'
+              : 'running') as 'running' | 'completed' | 'failed' | 'queued',
+            created_at: r.created_at,
+            duration_seconds: r.duration_seconds,
+            total_issues: r.total_issues,
+            critical_issues: r.critical_issues,
+            high_issues: r.high_issues,
+          })
+        );
+        const merged = Array.from(map.values()).sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setReviews(merged);
+      }
+    } catch {
+      // Offline fallback: keep local data
+    }
   };
 
   useEffect(() => {
@@ -40,10 +78,15 @@ export default function ReviewsHistoryPage() {
     return true;
   });
 
-  const handleDelete = (e: React.MouseEvent, reviewId: string) => {
+  const handleDelete = async (e: React.MouseEvent, reviewId: string) => {
     e.stopPropagation();
-    if (confirm('Remove this review from your local history?')) {
+    if (confirm('Remove this review from your history?')) {
       deleteStoredReview(reviewId);
+      try {
+        await apiClient.deleteReview(reviewId);
+      } catch {
+        // Ignore remote delete error
+      }
       loadData();
     }
   };

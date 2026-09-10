@@ -24,13 +24,13 @@ export const ReviewWorkspace: React.FC<ReviewWorkspaceProps> = ({
   const initialFile = report.file_reports[0]?.file_path || 'snippet.py';
   const [selectedFilePath, setSelectedFilePath] = useState<string>(initialFile);
 
-  const initialIssues = report.file_reports[0]?.issues || [];
+  const initialIssues = report.file_reports?.[0]?.issues || [];
   const [selectedIssue, setSelectedIssue] = useState<ReviewIssue | null>(
     initialIssues[0] || null
   );
 
   // When selected file changes, ensure selected issue is in that file if possible
-  const currentFileReport = report.file_reports.find(
+  const currentFileReport = report.file_reports?.find(
     (f) => f.file_path === selectedFilePath
   );
   const currentFileCode = currentFileReport?.file_content || '';
@@ -49,8 +49,8 @@ export const ReviewWorkspace: React.FC<ReviewWorkspaceProps> = ({
 
   const handleSelectFile = (filePath: string) => {
     setSelectedFilePath(filePath);
-    const targetFile = report.file_reports.find((f) => f.file_path === filePath);
-    if (targetFile && targetFile.issues.length > 0) {
+    const targetFile = report.file_reports?.find((f) => f.file_path === filePath);
+    if (targetFile && Array.isArray(targetFile.issues) && targetFile.issues.length > 0) {
       setSelectedIssue(targetFile.issues[0]);
     } else {
       setSelectedIssue(null);
